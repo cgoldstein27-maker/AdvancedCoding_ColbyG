@@ -1,6 +1,8 @@
 # AdvancedCoding_ColbyG
 
-Fall coding term project: a browser **NHL Franchise Simulator**.
+Repo for my coding fall term.
+
+Fall project: a browser **NHL Franchise Simulator**.
 
 ## Play the site
 
