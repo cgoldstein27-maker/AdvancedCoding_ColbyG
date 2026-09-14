@@ -1,3 +1,7 @@
+/**
+ * The pictures on the screen.
+ * This file draws buttons, tables, and pages, then listens when you click them.
+ */
 import * as G from "./game.js";
 import { formatMoney, formatCap, formatHeight, formatRecord, ovrTone, seasonLabel, streakLabel, pointsOf, ordinal, clamp } from "./utils.js";
 import { SKATER_KEYS, GOALIE_KEYS, POTENTIAL_LABEL, marketSalary, expectedRole } from "./players.js";
@@ -7,6 +11,7 @@ import { DIVISIONS } from "./data/teams.js";
 import { calendarLabel } from "./schedule.js";
 
 const app = document.getElementById("app");
+/** Little sticky notes about which page you are on, which team you picked, etc. */
 const ui = {
   screen: "title",
   view: "home",
@@ -22,11 +27,13 @@ const ui = {
   search: "",
 };
 
+/** Start the screen and redraw whenever the URL hash changes. */
 export function initUI() {
   bindHash();
   render();
 }
 
+/** #home, #roster... in the URL switches pages. */
 function bindHash() {
   window.addEventListener("hashchange", () => {
     const h = location.hash.slice(1);
@@ -37,6 +44,7 @@ function bindHash() {
   });
 }
 
+/** Wipe the page and draw the right screen for where you are. */
 function render() {
   if (ui.toast) setTimeout(() => { ui.toast = null; render(); }, 2800);
   if (!G.hasGame()) {
@@ -54,14 +62,16 @@ function render() {
   bind();
 }
 
+/** First screen: New Franchise, Continue, Load. */
 function titleScreen() {
   const saves = G.listSaves();
   return `
     <div class="title-screen">
       <div class="title-card">
-        <div class="kicker">Northwind Hockey League</div>
+        <div class="kicker">NHL Franchise Simulator</div>
         <h1>FRANCHISE</h1>
-        <p class="sub">Build a club. Survive the cap. Chase the Cup.</p>
+        <p class="sub">32 NHL clubs. Current rosters. Build a contender.</p>
+        <p class="faint">Fan-made simulator. Not affiliated with the NHL.</p>
         <div class="title-actions">
           <button class="btn gold" data-act="new">New Franchise</button>
           <button class="btn" data-act="load-autosave" ${saves.find((x) => x.slot === "autosave" && !x.empty) ? "" : "disabled"}>Continue</button>
@@ -81,6 +91,7 @@ function titleScreen() {
     </div>`;
 }
 
+/** Pick your NHL club, difficulty, and salary cap. */
 function setupScreen() {
   const teams = G.TEAM_TEMPLATES;
   const sel = teams.find((t) => t.id === ui.setup.teamId);
@@ -143,6 +154,7 @@ function setupScreen() {
     </div>`;
 }
 
+/** Sad screen if the owner fires you. */
 function firedScreen(s) {
   return `<div class="fired">
     <div>
@@ -154,6 +166,7 @@ function firedScreen(s) {
   </div>`;
 }
 
+/** The main game: sidebar on the left, page on the right. */
 function shell(s) {
   const t = s.teams[s.userTeamId];
   document.documentElement.style.setProperty("--team", t.colors.primary);
@@ -167,7 +180,7 @@ function shell(s) {
     <div class="app-shell">
       <aside class="sidebar">
         <div class="brand">
-          <div class="kicker">Northwind</div>
+          <div class="kicker">NHL</div>
           <h2>FRANCHISE</h2>
         </div>
         ${navBtn("home", "Home")}
@@ -200,10 +213,12 @@ function shell(s) {
   `;
 }
 
+/** One button in the left menu. */
 function navBtn(id, label) {
   return `<button class="nav-btn ${ui.view === id ? "active" : ""}" data-act="nav" data-view="${id}">${label}</button>`;
 }
 
+/** Home dashboard: record, cap, next game, news. */
 function viewHome(s, t) {
   const rank = G.userRank(s);
   const next = G.nextUserGame(s);
@@ -266,6 +281,7 @@ function viewHome(s, t) {
   `;
 }
 
+/** Sim next game / week / season buttons. They change in the playoffs. */
 function simControls(s) {
   if (s.phase === "playoffs") {
     return `<div class="title-actions">
@@ -294,10 +310,12 @@ function simControls(s) {
   </div>`;
 }
 
+/** A little stat card, like Record 12-8-2. */
 function kpi(label, value, sub) {
   return `<div class="card"><h3>${label}</h3><div class="stat">${value}</div><div class="muted">${sub || ""}</div></div>`;
 }
 
+/** Roster page with tabs for players, lines, contracts, depth. */
 function viewRoster(s, t) {
   const tabs = [["players", "Players"], ["lines", "Lines"], ["contracts", "Contracts"], ["depth", "Depth / farm"]];
   return `
@@ -313,6 +331,7 @@ function viewRoster(s, t) {
   `;
 }
 
+/** Table of your NHL players. */
 function rosterTable(s, t) {
   const players = t.roster.map((id) => s.players[id]).filter(Boolean).sort((a, b) => posOrder(a.position) - posOrder(b.position) || b.ratings.overall - a.ratings.overall);
   return `<div class="card" style="overflow:auto">
@@ -322,7 +341,7 @@ function rosterTable(s, t) {
         ${players.map((p) => `
           <tr class="clickable" data-act="player" data-id="${p.id}">
             <td><span class="ovr ${ovrTone(p.ratings.overall)}">${p.ratings.overall}</span></td>
-            <td>${esc(p.name)} ${p.captain ? `<span class="badge">${p.captain}</span>` : ""} ${p.injury ? `<span class="badge bad">INJ</span>` : ""}</td>
+            <td><div class="player-cell">${mug(p)}<span>${esc(p.name)} ${p.captain ? `<span class="badge">${p.captain}</span>` : ""} ${p.injury ? `<span class="badge bad">INJ</span>` : ""}</span></div></td>
             <td>${p.position}</td>
             <td class="num">${p.age}</td>
             <td class="num">${p.ratings.overall}</td>
@@ -338,6 +357,7 @@ function rosterTable(s, t) {
   </div>`;
 }
 
+/** Drag-style line editor (dropdowns for each slot). */
 function linesEditor(s, t) {
   const L = t.lines;
   const row = (key, label, n) => `
@@ -356,6 +376,7 @@ function linesEditor(s, t) {
   </div>`;
 }
 
+/** One dropdown on a line. */
 function lineSlot(s, t, key, i, pid) {
   const p = pid ? s.players[pid] : null;
   const opts = t.roster.map((id) => s.players[id]).filter(Boolean);
@@ -368,6 +389,7 @@ function lineSlot(s, t, key, i, pid) {
   </label>`;
 }
 
+/** Who is owed what money, and for how many years. */
 function contractsTable(s, t) {
   const players = t.roster.map((id) => s.players[id]).filter(Boolean).sort((a, b) => b.contract.salary - a.contract.salary);
   return `<div class="card" style="overflow:auto"><table>
@@ -385,6 +407,7 @@ function contractsTable(s, t) {
   </table></div>`;
 }
 
+/** Chart of how deep you are at each position. */
 function depthTable(s, t) {
   const farm = [...t.minors, ...t.prospects].map((id) => s.players[id]).filter(Boolean).sort((a, b) => b.potential.ceiling - a.potential.ceiling);
   return `<div class="card"><h3>Affiliate & prospects</h3>
@@ -397,6 +420,7 @@ function depthTable(s, t) {
     </tr>`).join("")}</tbody></table></div>`;
 }
 
+/** Trades, free agents, and waivers live on this page. */
 function viewTx(s, t) {
   const tabs = [["trades", "Trade machine"], ["fa", "Free agency"], ["waivers", "Waivers"]];
   return `
@@ -406,6 +430,7 @@ function viewTx(s, t) {
   `;
 }
 
+/** Two columns: you give stuff, they give stuff. */
 function tradeMachine(s, t) {
   const other = s.teams[ui.trade.teamId] || s.teams.tor;
   const giveV = 1, getV = 1;
@@ -432,6 +457,7 @@ function tradeMachine(s, t) {
   </div>`;
 }
 
+/** Quick "is this trade fair?" number. */
 function estimateRatio(s, fromId, toId) {
   if (!ui.trade.give.length && !ui.trade.get.length) return 1;
   const ev = G.previewTrade(toId, ui.trade.give, ui.trade.get);
@@ -439,6 +465,7 @@ function estimateRatio(s, fromId, toId) {
   return 1 / ev.ratio;
 }
 
+/** Dropdowns to add a player or pick to one side of a trade. */
 function assetPicker(s, team, side) {
   const players = [...team.roster, ...team.minors.slice(0, 8)].map((id) => s.players[id]).filter(Boolean);
   return `
@@ -456,11 +483,13 @@ function assetPicker(s, team, side) {
     </label>`;
 }
 
+/** A little pill showing one player or pick already in the deal. */
 function chip(s, a, side) {
   const label = a.kind === "player" ? s.players[a.id]?.name : G.pickLabel(s, a.id);
   return `<span class="chip">${esc(label)} <button data-act="rm-asset" data-side="${side}" data-id="${a.id}">×</button></span>`;
 }
 
+/** List of unsigned players you can offer money to. */
 function faBoard(s) {
   const list = G.faBoard(s).slice(0, 40);
   return `<div class="card" style="overflow:auto"><table>
@@ -474,6 +503,7 @@ function faBoard(s) {
     </tr>`).join("")}</tbody></table></div>`;
 }
 
+/** Weak NHL players you might send down or waive. */
 function waiverBoard(s, t) {
   const list = t.roster.map((id) => s.players[id]).filter(Boolean).sort((a, b) => a.ratings.overall - b.ratings.overall);
   return `<div class="card"><p class="muted">Send a player down or place them on waivers. Better players are more likely to be claimed.</p>
@@ -484,6 +514,7 @@ function waiverBoard(s, t) {
     </tr>`).join("")}</tbody></table></div>`;
 }
 
+/** Assign scouts and see fuzzy overalls for other teams. */
 function viewScouting(s, t) {
   const scouts = t.scouts.map((id) => s.scouts[id]).filter(Boolean);
   const targets = Object.values(s.players).filter((p) => p.status === "draft" || (p.status === "prospect" && p.teamId !== t.id) || (p.status === "nhl" && p.teamId !== t.id)).sort((a, b) => (b.scout?.knowledge || 0) - (a.scout?.knowledge || 0)).slice(0, 25);
@@ -513,6 +544,7 @@ function viewScouting(s, t) {
     </div>`;
 }
 
+/** Draft board: whose pick it is, and the kids still available. */
 function viewDraft(s) {
   if (!s.draft) {
     return `<div class="card"><h3>Draft</h3><p class="muted">The draft opens after the regular season and awards. Keep scouting in the meantime.</p>
@@ -555,6 +587,7 @@ function viewDraft(s) {
     </div>`;
 }
 
+/** Cap space, payroll, and ticket money. */
 function viewFinances(s, t) {
   const f = G.teamFinances(s, t.id);
   const players = t.roster.map((id) => s.players[id]).filter(Boolean).sort((a, b) => b.contract.salary - a.contract.salary);
@@ -572,15 +605,17 @@ function viewFinances(s, t) {
     </div>`;
 }
 
+/** League page: standings, stats leaders, awards. */
 function viewLeague(s) {
   const tabs = [["standings", "Standings"], ["stats", "Leaders"], ["awards", "Awards"]];
   return `
-    <div class="topbar"><div><div class="phase-chip">League</div><h1>Northwind Hockey</h1></div></div>
+    <div class="topbar"><div><div class="phase-chip">League</div><h1>National Hockey League</h1></div></div>
     <div class="tabs">${tabs.map(([id, l]) => `<button class="tab ${ui.leagueTab === id ? "active" : ""}" data-act="league-tab" data-id="${id}">${l}</button>`).join("")}</div>
     ${ui.leagueTab === "standings" ? standingsView(s) : ui.leagueTab === "stats" ? statsView(s) : awardsView(s)}
   `;
 }
 
+/** The big table of wins, losses, and points. */
 function standingsView(s) {
   return Object.keys(DIVISIONS).map((div) => {
     const rows = G.standingsList(s).filter((r) => r.team.division === div);
@@ -594,6 +629,7 @@ function standingsView(s) {
   }).join("");
 }
 
+/** Scoring and save-percentage leaders. */
 function statsView(s) {
   const pts = G.leaders(s, "p", null, 10);
   const g = G.leaders(s, "g", "F", 8);
@@ -606,6 +642,7 @@ function statsView(s) {
   </div>`;
 }
 
+/** Trophy case from past seasons. */
 function awardsView(s) {
   const last = s.history.awards[s.history.awards.length - 1];
   return `<div class="card">
@@ -617,6 +654,7 @@ function awardsView(s) {
   </div>`;
 }
 
+/** Upcoming games, or the playoff bracket when it is that time. */
 function viewCalendar(s, t) {
   const games = s.schedule.filter((g) => g.home === t.id || g.away === t.id).slice(0, 40);
   const po = s.playoffs;
@@ -636,6 +674,7 @@ function viewCalendar(s, t) {
     </div>`;
 }
 
+/** Draw every series in the current playoff round. */
 function playoffBracket(s, po) {
   const block = (title, arr) => `<div><h3>${title}</h3>${(arr || []).map((sr) => {
     const h = s.teams[sr.home]; const a = s.teams[sr.away];
@@ -651,6 +690,7 @@ function playoffBracket(s, po) {
   </div>`;
 }
 
+/** Cups, awards, and how the owner feels about you. */
 function viewFranchise(s, t) {
   return `
     <div class="topbar"><div><div class="phase-chip">Franchise</div><h1>Legacy ${s.legacy.score.toLocaleString()}</h1></div></div>
@@ -675,6 +715,7 @@ function viewFranchise(s, t) {
     </div>`;
 }
 
+/** Big popup with one player's skills, contract, and stats. */
 function playerModal(s, p) {
   if (!p) return "";
   const team = p.teamId ? s.teams[p.teamId] : null;
@@ -689,10 +730,13 @@ function playerModal(s, p) {
   return `<div class="modal-bg" data-act="close-modal">
     <div class="modal" data-stop="1">
       <div style="display:flex;justify-content:space-between;gap:12px">
-        <div>
+        <div style="display:flex;gap:14px;align-items:start">
+          ${mug(p, "lg")}
+          <div>
           <div class="kicker">${p.position} · #${p.jersey} · ${p.nationality}</div>
           <h1>${esc(p.name)}</h1>
           <div class="muted">${p.age} yrs · ${formatHeight(p.height)} · ${p.weight} lbs · ${team ? esc(team.displayName) : "Free agent"} · ${G.ARCHETYPES[p.archetype]?.label || p.archetype}</div>
+          </div>
         </div>
         <div style="text-align:right">
           <div class="ovr ${ovrTone(p.ratings.overall)}" style="font-size:42px">${p.ratings.overall}</div>
@@ -738,6 +782,7 @@ function playerModal(s, p) {
   </div>`;
 }
 
+/** Popup after a game showing the score and who scored. */
 function recapModal(s, gameId) {
   const g = s.schedule.find((x) => x.id === gameId) || findPlayoffGame(s, gameId);
   if (!g?.result) return "";
@@ -755,6 +800,7 @@ function recapModal(s, gameId) {
   </div></div>`;
 }
 
+/** Find a playoff game by id so the recap can show it. */
 function findPlayoffGame(s, id) {
   if (!s.playoffs) return null;
   for (const round of Object.values(s.playoffs.rounds)) {
@@ -768,6 +814,7 @@ function findPlayoffGame(s, id) {
   return null;
 }
 
+/** Listen for clicks and dropdown changes on the page. */
 function bind() {
   app.onclick = (e) => {
     if (e.target.closest("[data-stop]") && !e.target.closest("button, select, [data-act]")) return;
@@ -783,6 +830,7 @@ function bind() {
   };
 }
 
+/** The big switchboard: each button name runs a different game action. */
 function handle(act, el, e) {
   const s = G.getState();
   const id = el.dataset.id;
@@ -881,26 +929,41 @@ function handle(act, el, e) {
   if (actions[act]) actions[act]();
 }
 
+/** Team logo picture, or letters if the picture is missing. */
 function crest(t, size = "") {
+  if (t?.logo) {
+    return `<span class="crest logo ${size}" title="${esc(t.abbr)}"><img alt="${esc(t.abbr)}" src="${esc(t.logo)}" referrerpolicy="no-referrer" /></span>`;
+  }
   return `<span class="crest ${size}" style="background:${t.colors.primary};color:${t.colors.accent || "#fff"}">${t.abbr.slice(0, 3)}</span>`;
 }
 
+/** Player face photo. */
+function mug(p, size = "") {
+  if (!p?.headshot) return "";
+  return `<img class="headshot ${size}" alt="${esc(p.name)}" src="${esc(p.headshot)}" referrerpolicy="no-referrer" />`;
+}
+
+/** Make names safe to put in HTML so a quote cannot break the page. */
 function esc(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
+/** Contending / rebuilding / balanced in plain English. */
 function labelPhil(p) {
   return { contending: "Contender", rebuilding: "Rebuild", balanced: "Balanced" }[p] || p;
 }
 
+/** Sort order: centers, then wings, then defense, then goalies. */
 function posOrder(p) {
   return { C: 0, LW: 1, RW: 2, LD: 3, RD: 4, G: 5 }[p] ?? 9;
 }
 
+/** Turn wristAcc into Wrist Acc for the player card. */
 function labelKey(k) {
   return k.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
 }
 
+/** Average overall of the NHL roster. */
 function teamOvr(s, t) {
   const ps = t.roster.map((id) => s.players[id]).filter(Boolean);
   if (!ps.length) return 70;

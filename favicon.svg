@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Hockey puck">
+  <rect width="64" height="64" rx="14" fill="#070b14"/>
+  <ellipse cx="32" cy="38" rx="20" ry="8" fill="#1a2438"/>
+  <ellipse cx="32" cy="34" rx="20" ry="8" fill="#2a354d"/>
+  <ellipse cx="32" cy="32" rx="20" ry="8" fill="#3d4d6b"/>
+  <ellipse cx="32" cy="30" rx="14" ry="5" fill="#4da3ff" opacity=".35"/>
+  <path d="M14 28c6-10 30-10 36 0" fill="none" stroke="#7ec2ff" stroke-width="2.5" stroke-linecap="round"/>
+</svg>

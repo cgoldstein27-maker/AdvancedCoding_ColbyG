@@ -1,3 +1,4 @@
 .DS_Store
 .idea
 .vscode
+js/data/_nhl_raw.json

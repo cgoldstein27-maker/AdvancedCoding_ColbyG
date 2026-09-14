@@ -1,7 +1,12 @@
+/**
+ * How a hockey game is pretended.
+ * We score each team, roll for goals, then hand out points, injuries, and wins.
+ */
 import { clamp, poisson, posGroup } from "./utils.js";
 import { offensiveRating, defensiveRating, goalieRating, lineChemistry, skatingRating, emptySeasonStats } from "./players.js";
 import { autoLines } from "./generation.js";
 
+/** Kinds of ouches, from a short illness to a long knee injury. */
 const INJURIES = [
   { type: "Lower-body", days: [4, 14], sev: "minor" },
   { type: "Upper-body", days: [3, 12], sev: "minor" },
@@ -12,10 +17,12 @@ const INJURIES = [
   { type: "Concussion", days: [6, 21], sev: "major" },
 ];
 
+/** Turn player ids on a line into real player objects. */
 function linePlayers(state, ids) {
   return (ids || []).map((id) => state.players[id]).filter(Boolean);
 }
 
+/** How scary is this team tonight? Lines, goalie, coach, and chemistry all count. */
 export function teamStrength(state, teamId) {
   const team = state.teams[teamId];
   const L = team.lines;
@@ -71,21 +78,25 @@ export function teamStrength(state, teamId) {
   };
 }
 
+/** Happy players play a little better. */
 function moraleMod(p) {
   const m = p.morale ?? 70;
   return 0.92 + (m - 50) / 400;
 }
 
+/** Hurt players play worse. A major injury means they do not play. */
 function injuryMod(p) {
   if (!p.injury) return 1;
   return p.injury.severity === "major" ? 0 : 0.82;
 }
 
+/** Play one game: guess expected goals, roll the score, write the box score. */
 export function simulateGame(state, game, rng) {
   if (game.home !== state.userTeamId) autoLines(state, game.home);
   if (game.away !== state.userTeamId) autoLines(state, game.away);
   const homeS = teamStrength(state, game.home);
   const awayS = teamStrength(state, game.away);
+  // Home ice helps a little. Playoff home ice helps more.
   const homeIce = game.type === "playoff" ? 1.08 : 1.05;
   const hOff = homeS.offense * homeIce * (1 + (homeS.chemistry - 70) / 500) * (1 - homeS.fatigue * 0.002);
   const aOff = awayS.offense * (1 + (awayS.chemistry - 70) / 500) * (1 - awayS.fatigue * 0.002);
@@ -99,6 +110,7 @@ export function simulateGame(state, game, rng) {
     ag = Math.round((ag + aExp) / 2);
   }
 
+  // Tied after 60? Overtime. In the regular season it might go to a shootout.
   let ot = false;
   let so = false;
   let winner = null;
@@ -142,6 +154,7 @@ export function simulateGame(state, game, rng) {
   };
   game.played = true;
   game.result = result;
+  // Practice games do not count in the standings.
   if (game.type === "preseason") return result;
 
   applyRecord(state.teams[game.home], hg, ag, true, ot, so, winner === "home");
@@ -152,6 +165,7 @@ export function simulateGame(state, game, rng) {
   return result;
 }
 
+/** Hand out goals, assists, shots, and hits to the skaters who played. */
 function buildBox(state, teamId, home, gf, ga, rng, strength, gameType) {
   const team = state.teams[teamId];
   const skaters = [];
@@ -213,10 +227,12 @@ function buildBox(state, teamId, home, gf, ga, rng, strength, gameType) {
   return { shots, pp: `${ppg}/${rng.int(Math.max(ppg, 2), 5)}`, pim, events, goals: gf };
 }
 
+/** Playmakers get extra credit when we pick who assisted. */
 function passingW(p) {
   return (p.ratings.passing || 50) * (p.archetype === "playmaker" ? 1.35 : 1);
 }
 
+/** Add this game's stats onto the season (or playoff) totals. */
 function bumpSkater(p, playoffs, row) {
   const bucket = playoffs ? "playoffs" : "season";
   p.stats[bucket] = p.stats[bucket] || emptySeasonStats(false);
@@ -227,6 +243,7 @@ function bumpSkater(p, playoffs, row) {
   }
 }
 
+/** Give the starting goalie the win, loss, saves, and goals against. */
 function applyGoalie(state, teamId, ga, gf, win, ot, so, rng, box, gameType) {
   if (gameType === "preseason") return;
   const team = state.teams[teamId];
@@ -254,6 +271,7 @@ function applyGoalie(state, teamId, ga, gf, win, ot, so, rng, box, gameType) {
   s.gaa = s.gp ? (s.ga / s.gp) : 0;
 }
 
+/** Add a W, L, or OT to the team's record. */
 function applyRecord(team, gf, ga, home, ot, so, win) {
   team.record.gp++;
   team.record.gf += gf;
@@ -273,12 +291,14 @@ function applyRecord(team, gf, ga, home, ot, so, win) {
   team.record.last10 = team.record.last10.slice(0, 10);
 }
 
+/** Keep a winning or losing streak going, or start a new one. */
 function updateStreak(team, win, ot) {
   const type = win ? "W" : "L";
   if (team.streak?.type === type) team.streak.count++;
   else team.streak = { type, count: 1 };
 }
 
+/** Wins make the locker room happier. Losses do the opposite. */
 function updateMorale(state, game) {
   const homeWin = game.result.winner === "home";
   const bump = (id, amt) => {
@@ -295,6 +315,7 @@ function updateMorale(state, game) {
   bump(game.away, homeWin ? -1.1 : 1.2);
 }
 
+/** A small chance someone gets hurt during the game. */
 function maybeInjure(state, teamId, rng) {
   if (!rng.chance(0.045)) return null;
   const team = state.teams[teamId];
@@ -309,6 +330,7 @@ function maybeInjure(state, teamId, rng) {
   return p;
 }
 
+/** Injured players heal one day after each game. */
 function tickInjuries(state, teamId) {
   const team = state.teams[teamId];
   for (const id of [...team.roster, ...team.minors]) {
@@ -320,6 +342,7 @@ function tickInjuries(state, teamId) {
   }
 }
 
+/** Play every unplayed game on today's date. */
 export function simulateDay(state, rng) {
   const games = state.schedule.filter((g) => g.day === state.day && !g.played);
   const results = [];

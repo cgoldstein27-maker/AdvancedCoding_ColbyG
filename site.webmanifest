@@ -1,0 +1,18 @@
+{
+  "name": "NHL Franchise Simulator",
+  "short_name": "Franchise",
+  "description": "Fan-made hockey GM sim with current NHL teams and rosters.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#070b14",
+  "theme_color": "#070b14",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

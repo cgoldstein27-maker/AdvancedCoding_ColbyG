@@ -1,13 +1,19 @@
+/**
+ * Free agency is musical chairs for unsigned players.
+ * You offer money. Other teams offer money. The player picks who they like.
+ */
 import { playerDemand, evaluateOffer, applyContract } from "./contracts.js";
 import { capSpace } from "./finances.js";
 import { autoLines, getFreeAgents } from "./generation.js";
 import { addNews } from "./news.js";
 import { marketSalary } from "./players.js";
 
+/** Unsigned players, best overall first. */
 export function faBoard(state) {
   return getFreeAgents(state).sort((a, b) => b.ratings.overall - a.ratings.overall);
 }
 
+/** You make an offer. If they like it, they sign right now. */
 export function makeOfferToFA(state, playerId, offer) {
   const p = state.players[playerId];
   if (!p || p.status !== "fa") return { ok: false, error: "Player is not a free agent." };
@@ -26,11 +32,13 @@ export function makeOfferToFA(state, playerId, offer) {
   return { ok: true, signed: false, message: ev.message, demand: ev.demand };
 }
 
+/** Write the deal like "4 years at $8.00M AAV". */
 function formatTerm(offer) {
   const m = offer.salary / 1e6;
   return `${offer.years} year${offer.years > 1 ? "s" : ""} at $${m.toFixed(2)}M AAV`;
 }
 
+/** Computer teams grab leftover free agents, unless your offer is still better. */
 export function simulateFADay(state, rng) {
   const fas = faBoard(state).filter((p) => p.status === "fa");
   const teams = Object.values(state.teams);
@@ -70,6 +78,7 @@ export function simulateFADay(state, rng) {
   resolveUserOffers(state, rng);
 }
 
+/** Sometimes a player sleeps on your offer and signs the next day. */
 function resolveUserOffers(state, rng) {
   for (const [pid, offers] of Object.entries(state.faOffers)) {
     const p = state.players[pid];
@@ -84,6 +93,7 @@ function resolveUserOffers(state, rng) {
   }
 }
 
+/** Flip the calendar to free agency and clear old offers. */
 export function startFreeAgency(state) {
   state.phase = "freeAgency";
   state.faDay = 1;

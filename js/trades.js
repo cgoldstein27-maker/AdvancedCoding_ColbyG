@@ -1,9 +1,14 @@
+/**
+ * Trading players and picks.
+ * We score both sides. If the other GM thinks they win enough, they say yes.
+ */
 import { tradeValue, pickValue, marketSalary } from "./players.js";
 import { capSpace, addRetained } from "./finances.js";
 import { DIFFICULTY, clamp, posGroup } from "./utils.js";
 import { addNews } from "./news.js";
 import { autoLines } from "./generation.js";
 
+/** How much one player or pick is worth to a team. Rebuilders love kids and picks. */
 export function assetValue(state, asset, forTeamId) {
   if (asset.kind === "player") {
     const p = state.players[asset.id];
@@ -36,6 +41,7 @@ export function assetValue(state, asset, forTeamId) {
   return 0;
 }
 
+/** Find a draft pick by its id, no matter which team owns it. */
 export function findPick(state, pickId) {
   for (const t of Object.values(state.teams)) {
     const p = t.picks.find((x) => x.id === pickId);
@@ -44,6 +50,7 @@ export function findPick(state, pickId) {
   return null;
 }
 
+/** How badly this team needs this position. Weak goalies make them extra hungry. */
 export function positionalNeed(state, teamId, position) {
   const players = state.teams[teamId].roster.map((id) => state.players[id]).filter(Boolean);
   const g = posGroup(position);
@@ -56,6 +63,7 @@ export function positionalNeed(state, teamId, position) {
   return 0.85;
 }
 
+/** Should the other GM accept, reject, or send a counter? */
 export function evaluateTrade(state, fromId, toId, give, get, retainPct = 0) {
   const diff = DIFFICULTY[state.settings.difficulty] || DIFFICULTY.normal;
   const giveV = give.reduce((s, a) => s + assetValue(state, a, toId), 0);
@@ -110,6 +118,7 @@ export function evaluateTrade(state, fromId, toId, give, get, retainPct = 0) {
   return { accept, ratio, response, message, counter, giveV, getV };
 }
 
+/** Stop computer GMs from trading a young superstar for nothing. */
 function obviouslyStupid(state, cpuId, give, get) {
   const cpuGets = give.filter((a) => a.kind === "player").map((a) => state.players[a.id]);
   const cpuGives = get.filter((a) => a.kind === "player").map((a) => state.players[a.id]);
@@ -121,6 +130,7 @@ function obviouslyStupid(state, cpuId, give, get) {
   return false;
 }
 
+/** Both teams still need to fit under the salary cap after the swap. */
 function tradeCapOk(state, fromId, toId, give, get) {
   const salaryOut = (id, assets) =>
     assets.filter((a) => a.kind === "player").reduce((s, a) => s + (state.players[a.id]?.contract?.salary || 0), 0);
@@ -131,6 +141,7 @@ function tradeCapOk(state, fromId, toId, give, get) {
   return { ok: true };
 }
 
+/** "We will do it if you add a pick or a cheap extra player." */
 function buildCounter(state, userId, cpuId, give, get, rng) {
   const cpu = state.teams[cpuId];
   const extraPick = cpu.picks.find((p) => p.round >= 2 && p.year === state.season);
@@ -147,6 +158,7 @@ function buildCounter(state, userId, cpuId, give, get, rng) {
   return null;
 }
 
+/** Move the players and picks, then rewrite both teams' lines. */
 export function executeTrade(state, fromId, toId, give, get, retainPct = 0) {
   const move = (asset, src, dst) => {
     if (asset.kind === "player") {
@@ -197,6 +209,7 @@ export function executeTrade(state, fromId, toId, give, get, retainPct = 0) {
   return true;
 }
 
+/** Label a pick like "2027 1st (BOS)" if it used to belong to Boston. */
 export function pickLabel(state, pickId) {
   const p = findPick(state, pickId);
   if (!p) return "Pick";
@@ -204,10 +217,12 @@ export function pickLabel(state, pickId) {
   return `${p.year} ${roundName(p.round)}${orig}`;
 }
 
+/** 1st, 2nd, 3rd... for draft rounds. */
 function roundName(r) {
   return ["", "1st", "2nd", "3rd", "4th", "5th", "6th", "7th"][r] || `${r}th`;
 }
 
+/** Plain English for whether a trade looks fair. */
 export function valueLabel(ratio) {
   if (ratio >= 1.28) return { text: "Heavily in your favor", tone: "gold" };
   if (ratio >= 1.12) return { text: "In your favor", tone: "green" };
@@ -216,6 +231,7 @@ export function valueLabel(ratio) {
   return { text: "Lopsided against you", tone: "bad" };
 }
 
+/** Tiny dice used when the computer builds a counter-offer. */
 function rngFrom(state) {
   const { RNG } = { RNG: class {
     constructor() { this.n = (state.day + state.season) % 997; }
@@ -224,6 +240,7 @@ function rngFrom(state) {
   return new RNG();
 }
 
+/** Near the deadline, sellers ship rentals to buyers for draft picks. */
 export function cpuDeadlineActivity(state, rng) {
   const teams = Object.values(state.teams).filter((t) => t.id !== state.userTeamId);
   const sellers = teams.filter((t) => t.philosophy === "rebuilding" || pointsPct(t) < 0.42);
@@ -245,6 +262,7 @@ export function cpuDeadlineActivity(state, rng) {
   return deals;
 }
 
+/** Share of possible points. Used to spot buyers vs sellers. */
 function pointsPct(t) {
   if (!t.record.gp) return 0.5;
   return (t.record.w * 2 + t.record.ot) / (t.record.gp * 2);

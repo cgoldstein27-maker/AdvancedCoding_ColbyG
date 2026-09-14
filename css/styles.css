@@ -1,4 +1,7 @@
+/* The paint for the game. Colors, buttons, cards, and how the pages are laid out. */
+
 :root {
+  /* Color crayons the rest of the file can reuse. */
   --bg: #070b14;
   --bg-2: #0b1220;
   --panel: #121a2c;
@@ -80,7 +83,7 @@ button, input, select { font-family: inherit; }
 .ovr.ice { color: #c5d4ee; }
 .ovr.muted { color: var(--muted); }
 
-/* TITLE */
+/* TITLE — the first screen before you pick a team */
 .title-screen {
   min-height: 100vh; display: grid; place-items: center; padding: 32px;
   background: linear-gradient(180deg, rgba(7,11,20,0.2), #070b14 70%),
@@ -101,7 +104,7 @@ button, input, select { font-family: inherit; }
   background: var(--bg-2); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px;
 }
 
-/* SETUP */
+/* SETUP — pick-a-team grid */
 .wizard { min-height: 100vh; padding: 28px; }
 .wizard-head { max-width: 1200px; margin: 0 auto 18px; display: flex; justify-content: space-between; align-items: end; }
 .team-grid {
@@ -117,9 +120,26 @@ button, input, select { font-family: inherit; }
   width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center;
   font-family: var(--display); font-size: 16px; font-weight: 700; color: white; flex-shrink: 0;
   border: 2px solid rgba(255,255,255,0.2);
+  overflow: hidden;
 }
+.crest.logo {
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  width: 58px;
+  height: 40px;
+  padding: 0;
+}
+.crest.logo.sm { width: 34px; height: 24px; }
+.crest.logo.lg { width: 76px; height: 52px; }
+.crest img { width: 100%; height: 100%; object-fit: contain; display: block; }
 .crest.lg { width: 64px; height: 64px; font-size: 22px; }
 .crest.sm { width: 28px; height: 28px; font-size: 11px; }
+.headshot {
+  width: 36px; height: 36px; border-radius: 8px; object-fit: cover; background: #0b1220;
+  flex-shrink: 0; border: 1px solid var(--border);
+}
+.headshot.lg { width: 88px; height: 88px; border-radius: 12px; }
 .setup-panel {
   max-width: 1200px; margin: 18px auto 0; background: var(--panel); border: 1px solid var(--border);
   border-radius: 16px; padding: 18px; display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;
@@ -129,7 +149,7 @@ label.field select, label.field input, .search {
   background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 10px; padding: 8px 10px;
 }
 
-/* APP SHELL */
+/* APP SHELL — left menu + main page */
 .app-shell { display: grid; grid-template-columns: var(--sidebar) 1fr; min-height: 100vh; }
 .sidebar {
   background: #0a101c; border-right: 1px solid var(--border); padding: 16px 12px;
@@ -193,7 +213,7 @@ td:nth-child(2) { white-space: nowrap; }
 .meter { height: 8px; background: #0d1524; border-radius: 99px; overflow: hidden; }
 .meter > i { display: block; height: 100%; background: linear-gradient(90deg, var(--team), var(--accent-2)); }
 
-/* TRADE */
+/* TRADE — two columns, give vs get */
 .trade { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .trade-col { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 14px; min-height: 420px; }
 .chip-list { display: flex; flex-wrap: wrap; gap: 6px; min-height: 48px; }
@@ -202,7 +222,7 @@ td:nth-child(2) { white-space: nowrap; }
 }
 .chip button { background: none; border: 0; color: var(--danger); cursor: pointer; }
 
-/* MODAL */
+/* MODAL — popup card that sits on top of the page */
 .modal-bg {
   position: fixed; inset: 0; background: rgba(4, 8, 16, 0.72); display: grid; place-items: center; z-index: 20; padding: 20px;
 }
@@ -240,6 +260,7 @@ td:nth-child(2) { white-space: nowrap; }
 .fired { min-height: 100vh; display: grid; place-items: center; text-align: center; padding: 40px; }
 .fired h1 { font-size: 64px; color: var(--danger); }
 
+/* Phones: stack the sidebar on top instead of on the left. */
 @media (max-width: 980px) {
   .app-shell { grid-template-columns: 1fr; }
   .sidebar { position: relative; height: auto; flex-direction: row; flex-wrap: wrap; }

@@ -1,6 +1,11 @@
+/**
+ * The standings board.
+ * Who has the most points, who makes the playoffs, and who leads the league in stats.
+ */
 import { DIVISIONS, CONFERENCES } from "./data/teams.js";
 import { pointsOf } from "./utils.js";
 
+/** Sort every team by points. Ties go to more wins, then goal difference. */
 export function standingsList(state) {
   return Object.values(state.teams)
     .map((t) => ({
@@ -19,14 +24,17 @@ export function standingsList(state) {
     .sort((a, b) => b.pts - a.pts || b.row - a.row || b.diff - a.diff);
 }
 
+/** Standings for just one division, like the Atlantic. */
 export function divisionStandings(state, division) {
   return standingsList(state).filter((r) => r.team.division === division);
 }
 
+/** Standings for the East or the West. */
 export function conferenceStandings(state, conf) {
   return standingsList(state).filter((r) => r.team.conference === conf);
 }
 
+/** Pick 8 playoff teams per conference: top 3 in each division, then 2 wild cards. */
 export function playoffSeeds(state) {
   const seeds = { Eastern: [], Western: [] };
   for (const [conf, divs] of Object.entries(CONFERENCES)) {
@@ -40,6 +48,7 @@ export function playoffSeeds(state) {
   return seeds;
 }
 
+/** Top scorers, goalies, or whoever leads in a stat. */
 export function leaders(state, key, posGroupFilter = null, n = 10, bucket = "season") {
   let list = Object.values(state.players).filter((p) => p.status === "nhl" || (p.stats[bucket]?.gp || 0) > 0);
   if (posGroupFilter === "G") list = list.filter((p) => p.position === "G");
@@ -52,6 +61,7 @@ export function leaders(state, key, posGroupFilter = null, n = 10, bucket = "sea
     .slice(0, n);
 }
 
+/** Pull one number out of a player's stats (points, save %, goals against). */
 function statValue(p, key, bucket) {
   const s = p.stats[bucket] || {};
   if (key === "p") return (s.g || 0) + (s.a || 0);
@@ -60,6 +70,7 @@ function statValue(p, key, bucket) {
   return s[key] || 0;
 }
 
+/** Where your team sits in the league table. */
 export function userRank(state) {
   const list = standingsList(state);
   const i = list.findIndex((r) => r.team.id === state.userTeamId);

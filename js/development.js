@@ -1,7 +1,12 @@
+/**
+ * Offseason growth.
+ * Kids get better, veterans slow down, and everyone gets one year older.
+ */
 import { ageCurveModifier, calcOverall, SKATER_KEYS, GOALIE_KEYS } from "./players.js";
 import { clamp, posGroup, DIFFICULTY } from "./utils.js";
 import { addNews } from "./news.js";
 
+/** Age everyone up, grow their skills, and maybe retire the oldest. */
 export function developRoster(state, rng) {
   const diff = DIFFICULTY[state.settings.difficulty] || DIFFICULTY.normal;
   const news = [];
@@ -34,6 +39,7 @@ export function developRoster(state, rng) {
   return news;
 }
 
+/** Change one player's skills for next year. Ice time and work ethic help. */
 export function developPlayer(state, p, rng, diff) {
   const gp = p.stats.season?.gp || 0;
   const ice = p.status === "nhl" ? Math.min(1, gp / 70) : p.status === "minors" ? 0.55 : 0.3;
@@ -73,6 +79,7 @@ export function developPlayer(state, p, rng, diff) {
   }
 }
 
+/** Zero out this year's stats and team records so a new season can start. */
 export function resetSeasonStats(state) {
   for (const p of Object.values(state.players)) {
     if (p.status === "retired") continue;
@@ -91,6 +98,7 @@ export function resetSeasonStats(state) {
   }
 }
 
+/** Training camp bump: a few players tick up, everyone feels a bit fitter. */
 export function trainCamp(state, rng) {
   for (const t of Object.values(state.teams)) {
     for (const id of t.roster) {

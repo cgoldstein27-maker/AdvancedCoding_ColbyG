@@ -1,3 +1,7 @@
+/**
+ * End-of-year trophies.
+ * MVP, scoring champ, best goalie, and how good your franchise looks on the history page.
+ */
 import { leaders } from "./standings.js";
 import { addNews } from "./news.js";
 
@@ -11,6 +15,7 @@ export const AWARDS = [
   { id: "coach", name: "Bench Boss", desc: "Coach of the year" },
 ];
 
+/** Hand out every trophy and put winners in the news. */
 export function presentAwards(state) {
   const winners = {};
   const skaters = leaders(state, "p", null, 30).filter((x) => x.player.position !== "G");
@@ -67,6 +72,7 @@ export function presentAwards(state) {
   return winners;
 }
 
+/** Add points to your franchise score for wins, playoffs, and Cups. */
 export function updateLegacy(state, madePlayoffs, champion) {
   const t = state.teams[state.userTeamId];
   const pct = t.record.gp ? (t.record.w * 2 + t.record.ot) / (t.record.gp * 2) : 0;

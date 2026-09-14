@@ -1,3 +1,7 @@
+/**
+ * Name lists by country.
+ * Used for made-up prospects, coaches, and free agents (NHL stars keep their real names).
+ */
 export const NAMES = {
   CA: {
     first: ["Liam","Noah","Owen","Jack","Ethan","Lucas","Mason","Logan","Cole","Ryan","Tyler","Jake","Matt","Connor","Brayden","Dylan","Nathan","Alex","Josh","Adam","Eric","Scott","Mark","Chris","Andrew","Ben","Sam","Nick","Patrick","Sean","Brett","Cody","Drew","Evan","Garrett","Hunter","Ian","Joel","Kyle","Luke","Max","Nate","Reid","Travis","Wes","Zach","Aiden","Caleb","Declan","Finley","Graham","Hudson","Jonah","Kieran","Miles","Nolan","Parker","Quinton","Ronan","Theo"],
@@ -45,6 +49,7 @@ export const NAMES = {
   },
 };
 
+/** How common each nationality is. Canada and the US show up most. */
 export const NATIONALITIES = [
   { code: "CA", label: "Canada", weight: 38 },
   { code: "US", label: "United States", weight: 28 },
@@ -61,10 +66,12 @@ export const NATIONALITIES = [
 
 const USED = new Set();
 
+/** Pick a country, with Canada/USA more likely. */
 export function pickNationality(rng) {
   return rng.weighted(NATIONALITIES, (n) => n.weight).code;
 }
 
+/** First + last name that nobody else is using yet. */
 export function pickName(rng, nationality) {
   const pool = NAMES[nationality] || NAMES.CA;
   for (let i = 0; i < 40; i++) {
@@ -81,9 +88,12 @@ export function pickName(rng, nationality) {
   return { firstName: first, lastName: last, name: `${first} ${last}` };
 }
 
+/** Empty the used-name list when a new league starts. */
 export function resetNamePool() {
   USED.clear();
 }
 
+/** Coach first names. */
 export const COACH_FIRST = ["Joel","Mike","Pete","John","Dave","Rick","Todd","Paul","Bruce","Craig","Barry","Lane","Travis","Derek","Jon","Alain","Michel","Spencer","Gord","Nate"];
+/** Coach last names. */
 export const COACH_LAST = ["Harrow","Vale","Kessler","Bramble","Holt","Nashwood","Carrick","Dunne","Pellegrino","Sable","Merritt","Quill","Ashford","Brenner","Colton","Fairfax","Rourke","Voss","Lindell","Pryor"];

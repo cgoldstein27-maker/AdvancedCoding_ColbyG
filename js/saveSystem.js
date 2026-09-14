@@ -1,6 +1,12 @@
+/**
+ * Save and load your franchise.
+ * The browser remembers it, like a bookmark, so you can come back later.
+ */
+
 const PREFIX = "northwind_hockey_";
 const SLOTS = ["slot1", "slot2", "slot3", "autosave"];
 
+/** Look at all save slots and tell us who is in each one. */
 export function listSaves() {
   return SLOTS.map((slot) => {
     try {
@@ -22,6 +28,7 @@ export function listSaves() {
   });
 }
 
+/** Write the whole game into a slot. Also copies it to autosave. */
 export function saveTo(slot, state) {
   const team = state.teams[state.userTeamId];
   const payload = {
@@ -40,6 +47,7 @@ export function saveTo(slot, state) {
   return true;
 }
 
+/** Read a saved game back out of a slot. */
 export function loadFrom(slot) {
   const raw = localStorage.getItem(PREFIX + slot);
   if (!raw) return null;
@@ -47,6 +55,7 @@ export function loadFrom(slot) {
   return data.state;
 }
 
+/** Quiet save after big moments so you do not lose progress. */
 export function autosave(state) {
   try {
     saveTo("autosave", state);
@@ -55,6 +64,7 @@ export function autosave(state) {
   }
 }
 
+/** Erase one save slot. */
 export function deleteSave(slot) {
   localStorage.removeItem(PREFIX + slot);
 }

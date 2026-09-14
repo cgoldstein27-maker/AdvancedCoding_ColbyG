@@ -1,3 +1,7 @@
+/**
+ * The NHL draft.
+ * Bad teams get better lottery odds. Then everyone takes turns picking teenagers.
+ */
 import { createPlayer } from "./generation.js";
 import { scoutedView } from "./generation.js";
 import { POTENTIAL_CEILING, pickArchetype } from "./players.js";
@@ -5,6 +9,7 @@ import { clamp, uid, posGroup, ordinal } from "./utils.js";
 import { addNews } from "./news.js";
 import { autoLines } from "./generation.js";
 
+/** Make 224 kids for this year's draft class. The first few are the stars. */
 export function generateDraftClass(state, rng) {
   const prospects = [];
   const positions = [];
@@ -44,22 +49,26 @@ export function generateDraftClass(state, rng) {
   return prospects;
 }
 
+/** Best skills on the scouting report. */
 function describeStrengths(p) {
   const r = p.ratings;
   const entries = Object.entries(r).filter(([k]) => k !== "overall").sort((a, b) => b[1] - a[1]);
   return entries.slice(0, 3).map(([k]) => labelAttr(k));
 }
 
+/** Worst skills on the scouting report. */
 function describeWeaknesses(p) {
   const r = p.ratings;
   const entries = Object.entries(r).filter(([k]) => k !== "overall").sort((a, b) => a[1] - b[1]);
   return entries.slice(0, 2).map(([k]) => labelAttr(k));
 }
 
+/** Turn skating into Skating for the scouting card. */
 function labelAttr(k) {
   return k.replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase());
 }
 
+/** Lottery: worst teams get more balls in the hopper for the top 3 picks. */
 export function runLottery(state, rng) {
   const standings = Object.values(state.teams)
     .map((t) => ({ id: t.id, pts: t.record.w * 2 + t.record.ot, gp: t.record.gp, wins: t.record.w }))
@@ -79,6 +88,7 @@ export function runLottery(state, rng) {
   return [...order, ...playoffTeams];
 }
 
+/** Build the 7-round board and switch the game into draft mode. */
 export function startDraft(state, rng) {
   const lottery = runLottery(state, rng);
   const prospects = generateDraftClass(state, rng);
@@ -113,15 +123,18 @@ export function startDraft(state, rng) {
   return state.draft;
 }
 
+/** Whose turn is it right now? */
 export function currentDraftPick(state) {
   if (!state.draft || state.draft.complete) return null;
   return state.draft.picks[state.draft.cursor];
 }
 
+/** Kids still waiting to be picked. */
 export function availableProspects(state) {
   return state.draft.prospects.map((id) => state.players[id]).filter((p) => p && p.status === "draft");
 }
 
+/** Put this player on a team with a cheap 3-year starter contract. */
 export function draftPlayer(state, playerId) {
   const slot = currentDraftPick(state);
   if (!slot) return { ok: false, error: "Draft is over." };
@@ -157,6 +170,7 @@ export function draftPlayer(state, playerId) {
   return { ok: true, player: p, slot };
 }
 
+/** Computer GM picks someone they need, with a little scouting guesswork. */
 export function cpuDraftPick(state, rng) {
   const slot = currentDraftPick(state);
   if (!slot || slot.teamId === state.userTeamId) return null;
@@ -177,6 +191,7 @@ export function cpuDraftPick(state, rng) {
   return draftPlayer(state, chosen.id);
 }
 
+/** Does this team still need this position? Goalies are extra important if they only have a few. */
 function posNeed(state, teamId, position) {
   const t = state.teams[teamId];
   const all = [...t.roster, ...t.minors, ...t.prospects].map((id) => state.players[id]).filter(Boolean);
@@ -186,6 +201,7 @@ function posNeed(state, teamId, position) {
   return 0;
 }
 
+/** Fast-forward computer picks until it is your turn again. */
 export function autoSimDraftToUser(state, rng) {
   const results = [];
   while (!state.draft.complete) {

@@ -1,10 +1,16 @@
+/**
+ * The piggy bank and the salary cap.
+ * The cap is a money ceiling. You cannot pay everyone too much.
+ */
 import { formatCap } from "./utils.js";
 
+/** How much this player's contract counts against the cap. */
 export function capHitOf(player) {
   if (!player?.contract) return 0;
   return player.contract.salary || 0;
 }
 
+/** Add up NHL salaries, leftover retained money, and buried minors deals. */
 export function teamPayroll(state, teamId) {
   const team = state.teams[teamId];
   const nhl = team.roster.map((id) => state.players[id]).filter(Boolean);
@@ -17,12 +23,14 @@ export function teamPayroll(state, teamId) {
   return { rosterHit, retained, buried, total: rosterHit + retained + buried };
 }
 
+/** Room left under the salary cap. Negative means you are over. */
 export function capSpace(state, teamId) {
   const cap = state.settings.salaryCap;
   const pay = teamPayroll(state, teamId);
   return cap - pay.total;
 }
 
+/** Count forwards, defense, and goalies on the NHL roster. */
 export function rosterCounts(state, teamId) {
   const team = state.teams[teamId];
   const players = team.roster.map((id) => state.players[id]).filter(Boolean);
@@ -32,6 +40,7 @@ export function rosterCounts(state, teamId) {
   return { total: players.length, f, d, g };
 }
 
+/** Yellow and red flags: over the cap, too many players, no starter... */
 export function capWarnings(state, teamId) {
   const warnings = [];
   const pay = teamPayroll(state, teamId);
@@ -54,6 +63,7 @@ export function capWarnings(state, teamId) {
   return warnings;
 }
 
+/** Ticket money in, salaries out, and whether you made a profit. */
 export function teamFinances(state, teamId) {
   const team = state.teams[teamId];
   const pay = teamPayroll(state, teamId);
@@ -74,6 +84,7 @@ export function teamFinances(state, teamId) {
   };
 }
 
+/** Keep paying part of a traded player's salary so the other team can afford him. */
 export function addRetained(state, teamId, player, pct) {
   const team = state.teams[teamId];
   team.retained = team.retained || [];

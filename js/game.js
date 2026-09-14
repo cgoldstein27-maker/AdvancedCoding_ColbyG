@@ -1,3 +1,7 @@
+/**
+ * The remote control for the whole game.
+ * Buttons like "sim next game" and "start franchise" come through here.
+ */
 import { RNG, DIFFICULTY, clamp } from "./utils.js";
 import { generateLeague, autoLines, getTeamPlayers } from "./generation.js";
 import { generateSchedule, nextUserGame, upcomingUserGames, deadlineDay, calendarLabel } from "./schedule.js";
@@ -19,18 +23,22 @@ import { ARCHETYPES, POTENTIAL_LABEL, calcOverall } from "./players.js";
 
 let state = null;
 
+/** The live save sitting in memory right now. */
 export function getState() {
   return state;
 }
 
+/** Rebuild the dice from the save so luck stays the same. */
 export function rng() {
   return RNG.from(state.rng);
 }
 
+/** Remember where the dice left off. */
 function persistRng(r) {
   state.rng = r.serialize();
 }
 
+/** Start a brand-new franchise with your team, difficulty, and cap. */
 export function newGame(opts) {
   state = generateLeague({
     teamId: opts.teamId,
@@ -47,17 +55,19 @@ export function newGame(opts) {
   const r = rng();
   generateSchedule(state, r);
   persistRng(r);
-  addNews(state, "league", `Welcome to the ${state.teams[state.userTeamId].displayName}`, "Training camp is open. The Northwind Cup is the only trophy that matters.");
+  addNews(state, "league", `Welcome to the ${state.teams[state.userTeamId].displayName}`, "Training camp is open. The Stanley Cup is the only trophy that matters.");
   autosave(state);
   return state;
 }
 
+/** Write the game into a save slot. */
 export function saveGame(slot = "slot1") {
   if (!state) return false;
   saveTo(slot, state);
   return true;
 }
 
+/** Open a saved franchise. */
 export function loadGame(slot = "autosave") {
   const loaded = loadFrom(slot);
   if (!loaded) return null;
@@ -65,6 +75,7 @@ export function loadGame(slot = "autosave") {
   return state;
 }
 
+/** True if a franchise is already loaded. */
 export function hasGame() {
   return !!state;
 }
@@ -73,6 +84,7 @@ function assertRegular() {
   return state && (state.phase === "regular" || state.phase === "preseason" || state.phase === "deadline");
 }
 
+/** Play until your next game is done (and every other game on those days). */
 export function simNextGame() {
   if (state.phase === "playoffs") return simPlayoffGame();
   const r = rng();
@@ -106,11 +118,13 @@ export function simNextGame() {
   return log;
 }
 
+/** Only play the kind of games that belong in this part of the year. */
 function gameMatchesPhase(g) {
   if (state.phase === "preseason") return g.type === "preseason";
   return g.type !== "preseason";
 }
 
+/** Fast-forward this many days of games. */
 export function simDays(n) {
   if (state.phase === "playoffs") {
     const log = [];
@@ -148,10 +162,12 @@ export function simDays(n) {
   return log;
 }
 
+/** Jump ahead one week. */
 export function simWeek() {
   return simDays(7);
 }
 
+/** Jump to the trade deadline. */
 export function simToDeadline() {
   const log = [];
   while (state.day < deadlineDay() && state.phase !== "playoffs") {
@@ -163,6 +179,7 @@ export function simToDeadline() {
   return log;
 }
 
+/** Play the rest of the regular season. */
 export function simRestOfSeason() {
   const log = [];
   while (state.phase === "regular" || state.phase === "preseason" || state.phase === "deadline") {
@@ -180,6 +197,7 @@ export function simRestOfSeason() {
   return log;
 }
 
+/** Move the calendar one day: scouting, deadline, maybe the season ends. */
 function tickDay(r, days) {
   state.day += days;
   tickScouting(state, days, r);
@@ -204,10 +222,12 @@ function tickDay(r, days) {
   updatePhilosophies();
 }
 
+/** Stop simming if we already hit playoffs, awards, or the draft. */
 function checkPhaseGates() {
   return state.phase === "playoffs" || state.phase === "awards" || state.phase === "draft";
 }
 
+/** After a sim: streak news, injury news, then autosave. */
 function afterSim(log) {
   const userGames = log.filter((g) => g.home === state.userTeamId || g.away === state.userTeamId);
   for (const g of userGames) {
@@ -225,6 +245,7 @@ function afterSim(log) {
   autosave(state);
 }
 
+/** Regular season is over. Seed the playoffs. */
 function finishRegularSeason() {
   if (state.phase === "playoffs" || state.phase === "awards" || state.phase === "draft" || state.phase === "freeAgency") return;
   const seeds = playoffSeeds(state);
@@ -237,6 +258,7 @@ function finishRegularSeason() {
   autosave(state);
 }
 
+/** Play your next playoff game, or sim everyone else's if you are out. */
 export function simPlayoffGame() {
   const r = rng();
   const series = userSeries(state);
@@ -254,6 +276,7 @@ export function simPlayoffGame() {
   return null;
 }
 
+/** Finish your current series (or every series if you are watching). */
 export function simPlayoffSeries() {
   const r = rng();
   const series = userSeries(state);
@@ -264,6 +287,7 @@ export function simPlayoffSeries() {
   autosave(state);
 }
 
+/** Play out every series that is still going this round. */
 function simulateAllOpenSeries(r) {
   const po = state.playoffs;
   const round = po.round;
@@ -274,6 +298,7 @@ function simulateAllOpenSeries(r) {
   }
 }
 
+/** If every series has a winner, move to the next round. */
 function maybeAdvancePlayoffs(r) {
   const po = state.playoffs;
   if (!po || po.round === "done") return;
@@ -288,6 +313,7 @@ function maybeAdvancePlayoffs(r) {
   }
 }
 
+/** Sim the rest of the playoffs without clicking game by game. */
 export function skipUserPlayoffs() {
   const r = rng();
   while (state.phase === "playoffs") {
@@ -298,6 +324,7 @@ export function skipUserPlayoffs() {
   persistRng(r);
 }
 
+/** Cup is awarded. Next stop: trophies, then the draft. */
 function beginOffseason() {
   state.phase = "awards";
   const winners = presentAwards(state);
@@ -312,6 +339,7 @@ function beginOffseason() {
   return winners;
 }
 
+/** Step through awards → draft → free agency. */
 export function continueOffseason() {
   const r = rng();
   if (state.phase === "awards") {
@@ -334,6 +362,7 @@ export function continueOffseason() {
   return state.phase;
 }
 
+/** One day of free-agent signings around the league. */
 export function simFADay() {
   const r = rng();
   simulateFADay(state, r);
@@ -344,10 +373,12 @@ export function simFADay() {
   autosave(state);
 }
 
+/** Skip to the end of free agency. */
 export function skipFreeAgency() {
   while (state.phase === "freeAgency") simFADay();
 }
 
+/** Players grow, camp opens, and a new season calendar is built. */
 function finishFreeAgency() {
   const r = rng();
   developRoster(state, r);
@@ -366,6 +397,7 @@ function finishFreeAgency() {
   autosave(state);
 }
 
+/** You pick a kid. Computer teams pick until it is your turn again. */
 export function userDraft(playerId) {
   const r = rng();
   const res = draftPlayer(state, playerId);
@@ -377,6 +409,7 @@ export function userDraft(playerId) {
   return res;
 }
 
+/** Auto-pick the best leftover kid (or let a computer team pick). */
 export function simDraftPick() {
   const r = rng();
   const slot = currentDraftPick(state);
@@ -396,10 +429,12 @@ export function simDraftPick() {
   autosave(state);
 }
 
+/** Peek at whether the other GM would like this trade. */
 export function previewTrade(toId, give, get, retainPct = 0) {
   return evaluateTrade(state, state.userTeamId, toId, give, get, retainPct);
 }
 
+/** Send the trade. If they say yes, it happens. */
 export function proposeTrade(toId, give, get, retainPct = 0) {
   const ev = evaluateTrade(state, state.userTeamId, toId, give, get, retainPct);
   if (ev.accept) {
@@ -409,12 +444,14 @@ export function proposeTrade(toId, give, get, retainPct = 0) {
   return ev;
 }
 
+/** Take their counter-offer. */
 export function acceptCounter(toId, counter, retainPct = 0) {
   executeTrade(state, state.userTeamId, toId, counter.give, counter.get, retainPct);
   autosave(state);
   return true;
 }
 
+/** Offer a contract to a free agent or to someone already on your team. */
 export function signPlayer(playerId, offer) {
   const p = state.players[playerId];
   if (p.status === "fa") return makeOfferToFA(state, playerId, offer);
@@ -428,6 +465,7 @@ export function signPlayer(playerId, offer) {
   return { ok: true, signed: false, message: ev.message, demand: ev.demand };
 }
 
+/** Drop a player into a line slot, or set the starter/backup. */
 export function setLineSlot(lineKey, index, playerId) {
   const team = state.teams[state.userTeamId];
   if (lineKey === "starter" || lineKey === "backup") {
@@ -438,6 +476,7 @@ export function setLineSlot(lineKey, index, playerId) {
   rebuildScratches(team);
 }
 
+/** Anyone not in the lineup sits in the press box (scratches). */
 function rebuildScratches(team) {
   const used = new Set();
   for (const [k, v] of Object.entries(team.lines)) {
@@ -448,10 +487,12 @@ function rebuildScratches(team) {
   team.lines.scratches = team.roster.filter((id) => !used.has(id));
 }
 
+/** Let the computer set your lines by overall. */
 export function autoSetUserLines() {
   autoLines(state, state.userTeamId);
 }
 
+/** Bring a kid up from the minors. NHL roster max is 23. */
 export function callUp(playerId) {
   const team = state.teams[state.userTeamId];
   const p = state.players[playerId];
@@ -467,6 +508,7 @@ export function callUp(playerId) {
   return { ok: true };
 }
 
+/** Send a player to the farm team. Stars on one-way deals cannot just go down. */
 export function sendDown(playerId) {
   const team = state.teams[state.userTeamId];
   const p = state.players[playerId];
@@ -482,6 +524,7 @@ export function sendDown(playerId) {
   return { ok: true };
 }
 
+/** Put a player on waivers. Another team might steal him. */
 export function waivePlayer(playerId) {
   const p = state.players[playerId];
   const team = state.teams[state.userTeamId];
@@ -510,6 +553,7 @@ export function waivePlayer(playerId) {
   return { ok: true };
 }
 
+/** Bad records start selling. Hot teams start buying. */
 function updatePhilosophies() {
   if ((state.teams[state.userTeamId].record.gp || 0) < 20) return;
   for (const t of Object.values(state.teams)) {
@@ -520,6 +564,7 @@ function updatePhilosophies() {
   }
 }
 
+/** The owner gets happier with wins and madder with losing streaks. */
 function updateOwnerMidseason() {
   const t = state.teams[state.userTeamId];
   if (t.record.gp < 10) return;
@@ -536,6 +581,7 @@ function updateOwnerMidseason() {
   }
 }
 
+/** After the season, missed playoffs can get you fired. */
 function updateOwnerEnd(madePlayoffs, wonCup) {
   const patience = DIFFICULTY[state.settings.difficulty].ownerPatience;
   if (wonCup) state.owner.confidence = clamp(state.owner.confidence + 28, 0, 99);
@@ -547,6 +593,7 @@ function updateOwnerEnd(madePlayoffs, wonCup) {
   }
 }
 
+/** Shortcut to the team you are managing. */
 export function userTeam() {
   return state.teams[state.userTeamId];
 }

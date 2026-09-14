@@ -1,4 +1,8 @@
-import { TEAM_TEMPLATES, fullName } from "./data/teams.js";
+/**
+ * World builder.
+ * When you start a new franchise, this makes every team, player, coach, and scout.
+ */
+import { TEAM_TEMPLATES, fullName, NHL_ROSTERS } from "./data/teams.js";
 import { pickName, pickNationality, resetNamePool, COACH_FIRST, COACH_LAST } from "./data/names.js";
 import {
   ARCHETYPES, POTENTIAL_CEILING, pickArchetype, scaleToOverall, calcOverall,
@@ -6,11 +10,13 @@ import {
 } from "./players.js";
 import { RNG, clamp, uid, posGroup } from "./utils.js";
 
+/** Next unique id, like p_1001, p_1002... */
 function nextId(state, prefix) {
   state.nextId = (state.nextId || 1000) + 1;
   return `${prefix}_${state.nextId}`;
 }
 
+/** Fill in every skill number so they add up to the overall we want. */
 function makeRatings(rng, position, archetype, target) {
   const isG = position === "G";
   const keys = isG
@@ -29,6 +35,7 @@ function makeRatings(rng, position, archetype, target) {
   return player.ratings;
 }
 
+/** Guess how good this player might become. Young stars can grow a lot. */
 function pickPotential(rng, position, age, overall, youthBoost = 0) {
   const g = posGroup(position);
   let category;
@@ -59,6 +66,7 @@ function pickPotential(rng, position, age, overall, youthBoost = 0) {
   return { category, ceiling, floor, probability, curve: rng.pick(["early", "normal", "late"]) };
 }
 
+/** Write a starter contract. Kids often get a cheap entry-level deal. */
 function makeContract(rng, player, yearsLeft) {
   const elc = player.age <= 22 && player.ratings.overall < 82;
   const salary = elc ? rng.pick([775000, 825000, 875000, 925000, 950000]) : marketSalary(player) * rng.float(0.88, 1.12);
@@ -79,6 +87,7 @@ function makeContract(rng, player, yearsLeft) {
   };
 }
 
+/** Personality scores: work ethic, loyalty, how much they care about money... */
 function personality(rng) {
   return {
     workEthic: rng.clampNormal(70, 14, 30, 99),
@@ -90,9 +99,12 @@ function personality(rng) {
   };
 }
 
+/** Build one full player card: name, skills, contract, face photo. */
 export function createPlayer(state, rng, opts) {
   const nationality = opts.nationality || pickNationality(rng);
-  const names = pickName(rng, nationality);
+  const names = opts.firstName
+    ? { firstName: opts.firstName, lastName: opts.lastName, name: `${opts.firstName} ${opts.lastName}` }
+    : pickName(rng, nationality);
   const position = opts.position;
   const archetype = opts.archetype || pickArchetype(position, rng);
   const age = opts.age ?? rng.int(18, 36);
@@ -105,12 +117,12 @@ export function createPlayer(state, rng, opts) {
     age,
     born: state.season - age,
     position,
-    shoots: rng.chance(0.65) ? "L" : "R",
-    catches: rng.chance(0.6) ? "L" : "R",
-    height: position === "G" ? rng.int(73, 78) : rng.int(69, 78),
-    weight: position === "G" ? rng.int(185, 220) : rng.int(175, 235),
+    shoots: opts.shoots || (rng.chance(0.65) ? "L" : "R"),
+    catches: opts.shoots || (rng.chance(0.6) ? "L" : "R"),
+    height: opts.height || (position === "G" ? rng.int(73, 78) : rng.int(69, 78)),
+    weight: opts.weight || (position === "G" ? rng.int(185, 220) : rng.int(175, 235)),
     nationality,
-    jersey: 0,
+    jersey: opts.jersey || 0,
     teamId: opts.teamId || null,
     status: opts.status || "nhl",
     archetype,
@@ -136,14 +148,21 @@ export function createPlayer(state, rng, opts) {
     yearsPro: Math.max(0, age - 18 - (opts.prospect ? 2 : 0)),
     tradeRequest: false,
     captain: null,
+    headshot: opts.headshot || null,
+    nhlId: opts.nhlId || null,
   };
   player.ratings.overall = calcOverall(player);
   return player;
 }
 
+/** Give everyone a sweater number that is not already taken. 99 and 66 are retired. */
 function assignJerseys(rng, players) {
-  const used = new Set([99, 66, 69]);
+  const used = new Set(players.map((p) => p.jersey).filter(Boolean));
+  used.add(99);
+  used.add(66);
+  used.add(69);
   for (const p of players) {
+    if (p.jersey) continue;
     let n;
     let tries = 0;
     do {
@@ -155,6 +174,28 @@ function assignJerseys(rng, players) {
   }
 }
 
+/** Turn a real NHL roster row into a game player. */
+function playerFromNhl(state, rng, rec, teamId, status) {
+  return createPlayer(state, rng, {
+    firstName: rec.firstName,
+    lastName: rec.lastName,
+    position: rec.position,
+    age: rec.age,
+    overall: rec.overall,
+    teamId,
+    status,
+    nationality: rec.nationality,
+    shoots: rec.shoots,
+    height: rec.height,
+    weight: rec.weight,
+    jersey: rec.jersey,
+    headshot: rec.headshot,
+    nhlId: rec.nhlId,
+    youthBoost: status === "nhl" ? 0.12 : 0.35,
+  });
+}
+
+/** Make a coach with a system, like "speed" or "trap". */
 function makeCoach(rng, team) {
   const sys = rng.pick(["speed", "cycle", "trap", "forecheck", "balanced", "offensive"]);
   const quality = team.nhlQuality;
@@ -172,6 +213,7 @@ function makeCoach(rng, team) {
   };
 }
 
+/** Four scouts per team. One watches the NHL, one watches the draft. */
 function makeScouts(rng, teamId) {
   const regions = ["Canada", "USA", "Sweden", "Finland", "Russia", "Central Europe"];
   return Array.from({ length: 4 }, (_, i) => ({
@@ -184,6 +226,7 @@ function makeScouts(rng, teamId) {
   }));
 }
 
+/** Better clubs get higher overalls. Slot 0 is the star, later slots are depth. */
 function qualityOverall(rng, quality, slot, total, spread = 10) {
   const t = slot / Math.max(1, total - 1);
   const star = 62 + quality * 32;
@@ -192,6 +235,7 @@ function qualityOverall(rng, quality, slot, total, spread = 10) {
   return clamp(Math.round(rng.normal(target, spread * 0.35)), 55, 96);
 }
 
+/** Create the whole league from NHL teams, then fill farm teams and free agents. */
 export function generateLeague(settings) {
   resetNamePool();
   const seed = settings.seed || (Date.now() % 1e9);
@@ -231,6 +275,7 @@ export function generateLeague(settings) {
   };
 
   for (const tmpl of TEAM_TEMPLATES) {
+    // Copy the NHL club, then add empty lists for players, picks, and lines.
     const team = {
       ...tmpl,
       displayName: fullName(tmpl),
@@ -246,7 +291,7 @@ export function generateLeague(settings) {
       chemistry: rng.int(58, 78),
       attendance: 0.78 + tmpl.fanInterest / 500,
       retained: [],
-      history: { cups: rng.int(0, tmpl.nhlQuality > 0.8 ? 4 : 1), playoffApps: rng.int(8, 40), divisionTitles: rng.int(1, 12) },
+      history: { cups: tmpl.historyCups || 0, playoffApps: rng.int(8, 40), divisionTitles: rng.int(1, 12) },
       captains: { c: null, a: [] },
     };
     for (const s of makeScouts(rng, tmpl.id)) {
@@ -255,6 +300,7 @@ export function generateLeague(settings) {
     }
     for (let year = 0; year < 3; year++) {
       for (let round = 1; round <= 7; round++) {
+        // Sometimes a later-round pick was already traded away.
         if (year === 0 && round >= 3 && rng.chance(0.12)) continue;
         team.picks.push({
           id: uid("pk"),
@@ -272,50 +318,55 @@ export function generateLeague(settings) {
   for (const team of Object.values(state.teams)) {
     const q = team.nhlQuality;
     const youth = team.youth;
-    const fwPos = ["C", "LW", "RW", "C", "LW", "RW", "C", "LW", "RW", "C", "LW", "RW", "C"];
-    const dPos = ["LD", "RD", "LD", "RD", "LD", "RD", "LD", "RD"];
-    const nhl = [];
+    const bundled = NHL_ROSTERS[team.id] || { nhl: [], minors: [] };
+    // Real NHL names go on the big-league roster.
+    const nhl = bundled.nhl.map((rec) => playerFromNhl(state, rng, rec, team.id, "nhl"));
 
-    fwPos.forEach((position, i) => {
-      const ageMean = 28 - youth * 8;
-      const age = clamp(Math.round(rng.normal(ageMean, 4)), 19, 38);
-      const overall = qualityOverall(rng, q, i, fwPos.length, 9);
-      nhl.push(createPlayer(state, rng, { position, age, overall, teamId: team.id, status: "nhl", youthBoost: youth }));
-    });
-    dPos.forEach((position, i) => {
-      const ageMean = 29 - youth * 8;
-      const age = clamp(Math.round(rng.normal(ageMean, 4)), 19, 38);
-      const overall = qualityOverall(rng, q, i, dPos.length, 8);
-      nhl.push(createPlayer(state, rng, { position, age, overall, teamId: team.id, status: "nhl", youthBoost: youth }));
-    });
-    const g1 = qualityOverall(rng, q, 0, 3, 6);
-    const g2 = qualityOverall(rng, q * 0.85, 1, 3, 6);
-    nhl.push(createPlayer(state, rng, { position: "G", age: clamp(Math.round(rng.normal(29 - youth * 6, 5)), 22, 38), overall: g1, teamId: team.id, status: "nhl" }));
-    nhl.push(createPlayer(state, rng, { position: "G", age: clamp(Math.round(rng.normal(27, 5)), 22, 36), overall: Math.min(g1 - rng.int(4, 10), g2), teamId: team.id, status: "nhl" }));
+    // If a club is short, invent extra players so they can ice a team.
+    if (nhl.length < 20) {
+      const fwPos = ["C", "LW", "RW", "C", "LW", "RW", "C", "LW", "RW", "C", "LW", "RW", "C"];
+      const dPos = ["LD", "RD", "LD", "RD", "LD", "RD", "LD", "RD"];
+      const haveF = nhl.filter((p) => posGroup(p.position) === "F").length;
+      const haveD = nhl.filter((p) => posGroup(p.position) === "D").length;
+      const haveG = nhl.filter((p) => p.position === "G").length;
+      fwPos.slice(haveF).forEach((position, i) => {
+        nhl.push(createPlayer(state, rng, { position, age: rng.int(22, 32), overall: qualityOverall(rng, q, haveF + i, 13, 8), teamId: team.id, status: "nhl", youthBoost: youth }));
+      });
+      dPos.slice(haveD).forEach((position, i) => {
+        nhl.push(createPlayer(state, rng, { position, age: rng.int(22, 33), overall: qualityOverall(rng, q, haveD + i, 8, 8), teamId: team.id, status: "nhl", youthBoost: youth }));
+      });
+      if (haveG < 2) {
+        nhl.push(createPlayer(state, rng, { position: "G", age: rng.int(24, 34), overall: qualityOverall(rng, q, 1, 3, 6), teamId: team.id, status: "nhl" }));
+      }
+    }
 
     assignJerseys(rng, nhl);
     for (const p of nhl) state.players[p.id] = p;
     team.roster = nhl.map((p) => p.id);
 
-    const farm = [];
+    const farm = bundled.minors.map((rec) => {
+      const p = playerFromNhl(state, rng, rec, team.id, "minors");
+      p.contract.twoWay = true;
+      return p;
+    });
+    // Pad the AHL list so every club has some kids in the minors.
     const farmPos = ["C", "LW", "RW", "C", "LW", "RW", "C", "LW", "LD", "RD", "LD", "RD", "G", "G"];
-    farmPos.forEach((position, i) => {
-      const age = rng.int(19, 26);
+    farmPos.slice(0, Math.max(0, 10 - farm.length)).forEach((position, i) => {
       const pq = team.prospectQuality;
-      const overall = clamp(Math.round(rng.normal(58 + pq * 16 - i, 6)), 52, 78);
       const p = createPlayer(state, rng, {
-        position, age, overall, teamId: team.id, status: "minors", youthBoost: pq,
-        yearsLeft: rng.int(1, 3),
+        position, age: rng.int(19, 26), overall: clamp(Math.round(rng.normal(58 + pq * 16 - i, 6)), 52, 78),
+        teamId: team.id, status: "minors", youthBoost: pq, yearsLeft: rng.int(1, 3),
       });
       p.contract.twoWay = true;
       p.contract.salary = rng.pick([775000, 800000, 825000, 850000]);
       farm.push(p);
-      state.players[p.id] = p;
     });
+    for (const p of farm) state.players[p.id] = p;
     team.minors = farm.map((p) => p.id);
 
     const prosp = [];
     const nPros = 5 + Math.round(team.prospectQuality * 4);
+    // Made-up prospects sitting in junior / the pipeline.
     for (let i = 0; i < nPros; i++) {
       const position = rng.pick(["C", "LW", "RW", "LD", "RD", "G"]);
       const age = rng.int(18, 21);
@@ -333,6 +384,7 @@ export function generateLeague(settings) {
     team.prospects = prosp.map((p) => p.id);
 
     const skaters = nhl.filter((p) => p.position !== "G").sort((a, b) => b.personality.leadership - a.personality.leadership);
+    // Highest leadership gets the C. Next two get A's.
     if (skaters[0]) team.captains.c = skaters[0].id;
     team.captains.a = skaters.slice(1, 3).map((p) => p.id);
     for (const p of nhl) {
@@ -353,6 +405,7 @@ export function generateLeague(settings) {
   return state;
 }
 
+/** Empty lineup card: 4 forward lines, 3 D pairs, power play, penalty kill, goalies. */
 export function emptyLines() {
   return {
     f1: [null, null, null],
@@ -372,10 +425,12 @@ export function emptyLines() {
   };
 }
 
+/** Fresh 0-0-0 record for a new season. */
 export function blankRecord() {
   return { gp: 0, w: 0, l: 0, ot: 0, gf: 0, ga: 0, homeW: 0, homeL: 0, homeOT: 0, streakW: 0, streakL: 0, last10: [] };
 }
 
+/** Auto-set lines: best players on line 1, next on line 2, and so on. */
 export function autoLines(state, teamId) {
   const team = state.teams[teamId];
   const players = team.roster.map((id) => state.players[id]).filter(Boolean);
@@ -416,6 +471,7 @@ export function autoLines(state, teamId) {
   team.lines = lines;
 }
 
+/** Invent unsigned free agents sitting on the open market. */
 function generateFreeAgents(state, rng, count) {
   const positions = [];
   for (let i = 0; i < count; i++) {
@@ -431,6 +487,7 @@ function generateFreeAgents(state, rng, count) {
   }
 }
 
+/** You know your own players perfectly. Other teams are a bit fuzzy. */
 function initScoutingKnowledge(state, rng) {
   for (const p of Object.values(state.players)) {
     const isOwn = p.teamId === state.userTeamId;
@@ -444,6 +501,7 @@ function initScoutingKnowledge(state, rng) {
   }
 }
 
+/** What you see on a scouting report. Low knowledge means a wide guess range. */
 export function scoutedView(player, userTeamId) {
   const k = player.teamId === userTeamId ? 100 : player.scout?.knowledge || 20;
   const fuzz = Math.max(0, Math.round((100 - k) / 12));
@@ -462,6 +520,7 @@ export function scoutedView(player, userTeamId) {
   };
 }
 
+/** What the owner wants this year: Cup, playoffs, or develop kids. */
 function buildOwnerGoals(team, chosen) {
   const goals = [];
   if (chosen === "cup" || team.ownerExpectations === "cup") goals.push({ id: "cup", label: "Win the championship", weight: 40 });
@@ -480,12 +539,14 @@ function buildOwnerGoals(team, chosen) {
   return goals;
 }
 
+/** Players on this team. Optionally include the minors and prospects too. */
 export function getTeamPlayers(state, teamId, includeMinors = false) {
   const team = state.teams[teamId];
   const ids = includeMinors ? [...team.roster, ...team.minors, ...team.prospects] : team.roster;
   return ids.map((id) => state.players[id]).filter(Boolean);
 }
 
+/** Everyone with no team right now. */
 export function getFreeAgents(state) {
   return Object.values(state.players).filter((p) => p.status === "fa" && !p.teamId);
 }

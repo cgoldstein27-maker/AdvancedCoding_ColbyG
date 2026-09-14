@@ -1,5 +1,10 @@
+/**
+ * Quick robot test.
+ * Starts a Bruins franchise, sims a season, and yells if something is broken.
+ */
 import { newGame, getState, simWeek, simRestOfSeason, skipUserPlayoffs, continueOffseason, simDraftPick, skipFreeAgency } from "./js/game.js";
 
+// Fake browser storage so this can run in Node, not only in Chrome.
 globalThis.localStorage = {
   _d: {},
   setItem(k, v) { this._d[k] = v; },

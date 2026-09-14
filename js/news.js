@@ -1,3 +1,9 @@
+/**
+ * The newspaper.
+ * Stories about trades, injuries, and big wins show up on your home screen.
+ */
+
+/** Add a story to the top of the news list. We only keep the last 250. */
 export function addNews(state, type, title, body, extra = {}) {
   const item = {
     id: state.nextNewsId++,
@@ -14,10 +20,12 @@ export function addNews(state, type, title, body, extra = {}) {
   return item;
 }
 
+/** Grab the newest stories, maybe just for your team. */
 export function recentNews(state, n = 8, teamId = null) {
   return state.news.filter((nws) => !teamId || nws.teamId === teamId || nws.type === "league").slice(0, n);
 }
 
+/** One-line score, like BOS 4–2 TOR in OT. */
 export function gameHeadline(home, away, result) {
   const hw = result.homeGoals > result.awayGoals || (result.homeGoals === result.awayGoals && result.winner === "home");
   const winner = hw ? home : away;
@@ -28,6 +36,7 @@ export function gameHeadline(home, away, result) {
   return `${winner.abbr} ${ws}–${ls} ${loser.abbr}${extra}`;
 }
 
+/** Make up a trade rumor: a bad team might shop a star to a good team. */
 export function rumorFor(state, rng) {
   const teams = Object.values(state.teams);
   const sellers = teams.filter((t) => t.philosophy === "rebuilding" || (t.record.gp > 20 && t.record.w / Math.max(1, t.record.gp) < 0.4));

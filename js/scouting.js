@@ -1,6 +1,11 @@
+/**
+ * Your scouts are spies with clipboards.
+ * The more they watch a player, the closer their guess is to the real overall.
+ */
 import { clamp } from "./utils.js";
 import { scoutedView } from "./generation.js";
 
+/** Tell a scout what to watch: NHL players, kids in the draft, or one country. */
 export function assignScout(state, scoutId, assignment, region = null) {
   const scout = state.scouts[scoutId];
   if (!scout) return false;
@@ -9,6 +14,7 @@ export function assignScout(state, scoutId, assignment, region = null) {
   return true;
 }
 
+/** Each week, scouts learn a little more about players they are watching. */
 export function tickScouting(state, days, rng) {
   const userScouts = Object.values(state.scouts).filter((s) => s.teamId === state.userTeamId);
   const targets = Object.values(state.players).filter((p) => p.status !== "retired" && p.teamId !== state.userTeamId);
@@ -29,6 +35,7 @@ export function tickScouting(state, days, rng) {
   }
 }
 
+/** Map a country code to a scouting region. */
 function nationalityRegion(code) {
   if (code === "CA") return "Canada";
   if (code === "US") return "USA";
@@ -37,6 +44,7 @@ function nationalityRegion(code) {
   return "Central Europe";
 }
 
+/** What you think this player is, based on how well you have scouted him. */
 export function reportFor(player, userTeamId) {
   const v = scoutedView(player, userTeamId);
   const range = v.overallRange[0] === v.overallRange[1] ? `${v.overallRange[0]}` : `${v.overallRange[0]}–${v.overallRange[1]}`;

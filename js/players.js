@@ -1,5 +1,10 @@
+/**
+ * Player report-card math.
+ * Overall rating, player types (sniper, playmaker...), and how much a player is worth.
+ */
 import { clamp, posGroup } from "./utils.js";
 
+/** Skills for skaters, like skating and shooting. */
 export const SKATER_KEYS = [
   "skating", "acceleration", "speed", "agility", "balance", "strength",
   "puckControl", "passing", "offAwareness", "defAwareness", "handEye",
@@ -7,10 +12,12 @@ export const SKATER_KEYS = [
   "physicality", "checking", "stickChecking", "faceoffs", "discipline",
 ];
 
+/** Skills just for goalies. */
 export const GOALIE_KEYS = [
   "positioning", "reflexes", "rebound", "glove", "blocker", "pokeCheck", "athleticism", "consistency",
 ];
 
+/** Player styles. A sniper loves scoring. A grinder loves hitting. */
 export const ARCHETYPES = {
   sniper: { label: "Sniper", group: "F", weights: { wristAcc: 1.25, wristPower: 1.2, slapAcc: 1.15, slapPower: 1.12, offAwareness: 1.12, handEye: 1.18, passing: 0.9, defAwareness: 0.88 } },
   playmaker: { label: "Playmaker", group: "F", weights: { passing: 1.28, puckControl: 1.22, offAwareness: 1.18, vision: 1.2, skating: 1.08, wristAcc: 0.95, physicality: 0.88 } },
@@ -25,12 +32,14 @@ export const ARCHETYPES = {
   athleticG: { label: "Athletic", group: "G", weights: { reflexes: 1.2, athleticism: 1.18, glove: 1.1, consistency: 0.9, positioning: 0.95 } },
 };
 
+/** How high a kid might grow, like "top line" or "bottom pair". */
 export const POTENTIALS = {
   F: ["franchise", "elite", "topLine", "top6", "middle6", "bottom6"],
   D: ["franchise", "elite", "top4", "top4", "bottomPair", "bottomPair"],
   G: ["franchise", "starter", "starter", "backup", "backup"],
 };
 
+/** The best overall number each potential label can reach. */
 export const POTENTIAL_CEILING = {
   franchise: [94, 99],
   elite: [90, 94],
@@ -44,6 +53,7 @@ export const POTENTIAL_CEILING = {
   backup: [72, 80],
 };
 
+/** Pretty names for those potential labels. */
 export const POTENTIAL_LABEL = {
   franchise: "Franchise",
   elite: "Elite",
@@ -57,6 +67,7 @@ export const POTENTIAL_LABEL = {
   backup: "Backup",
 };
 
+/** How much each skill counts toward overall. Forwards care more about shooting. */
 const SKATER_WEIGHTS = {
   F: {
     skating: 0.07, acceleration: 0.04, speed: 0.05, agility: 0.04, balance: 0.03, strength: 0.04,
@@ -72,10 +83,12 @@ const SKATER_WEIGHTS = {
   },
 };
 
+/** How much each goalie skill counts toward overall. */
 const GOALIE_WEIGHTS = {
   positioning: 0.18, reflexes: 0.16, rebound: 0.14, glove: 0.12, blocker: 0.1, pokeCheck: 0.08, athleticism: 0.12, consistency: 0.1,
 };
 
+/** Start every skill at 50, like a blank hockey card. */
 export function emptyRatings(isGoalie) {
   const r = { overall: 50 };
   const keys = isGoalie ? GOALIE_KEYS : SKATER_KEYS;
@@ -83,6 +96,7 @@ export function emptyRatings(isGoalie) {
   return r;
 }
 
+/** Mix all the skills into one overall number from 40 to 99. */
 export function calcOverall(player) {
   const ratings = player.ratings;
   if (player.position === "G") {
@@ -102,6 +116,7 @@ export function calcOverall(player) {
   return clamp(Math.round(t / wsum), 40, 99);
 }
 
+/** Nudge every skill up or down until overall matches the number we want. */
 export function scaleToOverall(player, target) {
   player.ratings.overall = calcOverall(player);
   const cur = player.ratings.overall;
@@ -124,6 +139,7 @@ export function scaleToOverall(player, target) {
   }
 }
 
+/** Pick a player style that fits the position. */
 export function pickArchetype(position, rng) {
   const g = posGroup(position);
   if (g === "G") return rng.pick(["hybridG", "butterflyG", "athleticG"]);
@@ -137,41 +153,48 @@ export function pickArchetype(position, rng) {
   );
 }
 
+/** How good is this player at scoring and making plays? */
 export function offensiveRating(player) {
   const r = player.ratings;
   if (player.position === "G") return 40;
   return Math.round(r.offAwareness * 0.28 + r.wristAcc * 0.18 + r.wristPower * 0.12 + r.passing * 0.18 + r.puckControl * 0.14 + r.handEye * 0.1);
 }
 
+/** How good is this player at stopping the other team? */
 export function defensiveRating(player) {
   const r = player.ratings;
   if (player.position === "G") return Math.round(r.positioning * 0.5 + r.rebound * 0.3 + r.pokeCheck * 0.2);
   return Math.round(r.defAwareness * 0.4 + r.stickChecking * 0.2 + r.checking * 0.15 + r.skating * 0.15 + r.discipline * 0.1);
 }
 
+/** How fast and smooth this player skates. */
 export function skatingRating(player) {
   const r = player.ratings;
   if (player.position === "G") return r.athleticism;
   return Math.round(r.skating * 0.4 + r.speed * 0.3 + r.acceleration * 0.2 + r.agility * 0.1);
 }
 
+/** How well this player shoots the puck. */
 export function shootingRating(player) {
   const r = player.ratings;
   if (player.position === "G") return 30;
   return Math.round(r.wristAcc * 0.35 + r.wristPower * 0.25 + r.slapAcc * 0.2 + r.slapPower * 0.1 + r.handEye * 0.1);
 }
 
+/** How well this player passes. */
 export function passingRating(player) {
   if (player.position === "G") return 40;
   return Math.round(player.ratings.passing * 0.6 + player.ratings.puckControl * 0.25 + player.ratings.offAwareness * 0.15);
 }
 
+/** How good a goalie is at stopping pucks. */
 export function goalieRating(player) {
   if (player.position !== "G") return 40;
   const r = player.ratings;
   return Math.round(r.positioning * 0.3 + r.reflexes * 0.25 + r.rebound * 0.2 + r.consistency * 0.15 + r.athleticism * 0.1);
 }
 
+/** Guess the line or pair this player should play on. */
 export function expectedRole(player) {
   const o = player.ratings.overall;
   const g = posGroup(player.position);
@@ -187,6 +210,7 @@ export function expectedRole(player) {
   return "line4";
 }
 
+/** Young players grow. Old players get slower. This number says by how much. */
 export function ageCurveModifier(age, position) {
   const g = posGroup(position);
   const peak = g === "G" ? 29 : g === "D" ? 28 : 27;
@@ -199,6 +223,7 @@ export function ageCurveModifier(age, position) {
   return g === "G" ? -0.8 : -1.35;
 }
 
+/** Empty stat line for a new season (goals, assists, wins...). */
 export function emptySeasonStats(isGoalie) {
   if (isGoalie) {
     return { gp: 0, gs: 0, w: 0, l: 0, ot: 0, ga: 0, sa: 0, so: 0, toi: 0, gaa: 0, svpct: 0 };
@@ -206,6 +231,7 @@ export function emptySeasonStats(isGoalie) {
   return { gp: 0, g: 0, a: 0, p: 0, plusMinus: 0, pim: 0, ppp: 0, shg: 0, sog: 0, hits: 0, blocks: 0, foi: 0, fow: 0, toi: 0 };
 }
 
+/** Add two stat lines together, like season + playoffs. */
 export function combineStats(a, b, isGoalie) {
   const out = { ...(a || emptySeasonStats(isGoalie)) };
   const add = b || emptySeasonStats(isGoalie);
@@ -220,11 +246,13 @@ export function combineStats(a, b, isGoalie) {
   return out;
 }
 
+/** Goals divided by shots. Higher means they bury their chances. */
 export function shootingPct(stats) {
   if (!stats || !stats.sog) return 0;
   return (stats.g / stats.sog) * 100;
 }
 
+/** Do these linemates fit together? A sniper plus a passer is extra good. */
 export function lineChemistry(players) {
   if (!players.length) return 50;
   const arch = players.map((p) => p.archetype);
@@ -245,6 +273,7 @@ export function lineChemistry(players) {
   return clamp(Math.round(score), 35, 99);
 }
 
+/** How valuable this player is in a trade, like a baseball card's price. */
 export function tradeValue(player, { needBonus = 1 } = {}) {
   if (!player) return 0;
   const o = player.ratings.overall;
@@ -270,6 +299,7 @@ export function tradeValue(player, { needBonus = 1 } = {}) {
   return Math.round(v * needBonus);
 }
 
+/** Fair yearly pay for this player. Stars cost more. Kids on ELCs cost less. */
 export function marketSalary(player) {
   const o = player.ratings.overall;
   const g = posGroup(player.position);
@@ -289,6 +319,7 @@ export function marketSalary(player) {
   return Math.round(base / 25000) * 25000;
 }
 
+/** How much a draft pick is worth. 1st round now is way better than a 7th later. */
 export function pickValue(round, yearOffset = 0) {
   const table = [0, 2200, 900, 420, 220, 130, 80, 50];
   const base = table[round] || 30;

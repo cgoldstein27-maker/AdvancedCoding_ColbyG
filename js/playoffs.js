@@ -1,9 +1,14 @@
+/**
+ * The Stanley Cup playoffs.
+ * Best of 7: first to 4 wins. Then the winners play each other until one champ is left.
+ */
 import { playoffSeeds } from "./standings.js";
 import { simulateGame } from "./simulation.js";
 import { addNews } from "./news.js";
 import { uid } from "./utils.js";
 import { autoLines } from "./generation.js";
 
+/** Seed 16 teams and start Round 1. 1 plays 8, 2 plays 7, and so on. */
 export function startPlayoffs(state) {
   const seeds = playoffSeeds(state);
   const makeRound = (conf, list) => {
@@ -39,6 +44,7 @@ export function startPlayoffs(state) {
   return userIn;
 }
 
+/** One series box: two teams, a win count, and home-ice for the higher seed. */
 function series(a, b, conf, round) {
   return {
     id: uid("sr"),
@@ -53,6 +59,7 @@ function series(a, b, conf, round) {
   };
 }
 
+/** 2-2-1-1-1 home ice: higher seed hosts games 1, 2, 5, and 7. */
 function homeForGame(series, gameNum) {
   const h = series.homeIce;
   const a = series.home === h ? series.away : series.home;
@@ -60,6 +67,7 @@ function homeForGame(series, gameNum) {
   return map[gameNum];
 }
 
+/** Play one playoff game and add a win. Four wins ends the series. */
 export function simulateSeriesGame(state, series, rng) {
   if (series.winner) return null;
   const n = series.games.length + 1;
@@ -79,12 +87,14 @@ export function simulateSeriesGame(state, series, rng) {
   return game;
 }
 
+/** Keep playing until someone wins the series. */
 export function simulateSeries(state, series, rng) {
   const games = [];
   while (!series.winner) games.push(simulateSeriesGame(state, series, rng));
   return games;
 }
 
+/** When a round is done, pair the winners for the next round, or crown a champion. */
 export function advancePlayoffRound(state, rng) {
   const po = state.playoffs;
   const round = po.round;
@@ -112,6 +122,7 @@ export function advancePlayoffRound(state, rng) {
   }
 }
 
+/** Turn four series winners into two new series. */
 function pairWinners(seriesList, conf, round) {
   const winners = seriesList.map((s) => s.winner).filter(Boolean);
   const out = [];
@@ -121,11 +132,12 @@ function pairWinners(seriesList, conf, round) {
   return out;
 }
 
+/** They won the Cup. Add it to history and pick a playoff MVP. */
 function crownChampion(state, teamId) {
   const team = state.teams[teamId];
   team.history.cups++;
   state.history.champions.push({ season: state.season, teamId, name: team.displayName });
-  addNews(state, "cup", `${team.displayName} win the Northwind Cup`, `Champions of ${state.season}–${String(state.season + 1).slice(2)}.`, { teamId });
+  addNews(state, "cup", `${team.displayName} win the Stanley Cup`, `Champions of ${state.season}–${String(state.season + 1).slice(2)}.`, { teamId });
   if (teamId === state.userTeamId) {
     state.legacy.cups++;
     state.legacy.score += 1800;
@@ -140,6 +152,7 @@ function crownChampion(state, teamId) {
   }
 }
 
+/** The series your team is playing right now, if you are still alive. */
 export function userSeries(state) {
   if (!state.playoffs) return null;
   const po = state.playoffs;
@@ -154,6 +167,7 @@ export function userSeries(state) {
   return null;
 }
 
+/** Are you still in the dance, or already eliminated? */
 export function userStillAlive(state) {
   if (!state.playoffs) return false;
   if (state.playoffs.champion) return state.playoffs.champion === state.userTeamId;

@@ -1,7 +1,12 @@
+/**
+ * Money talks.
+ * This file decides what a player wants to get paid, and writes the contract.
+ */
 import { marketSalary, expectedRole } from "./players.js";
 import { clamp, DIFFICULTY } from "./utils.js";
 import { addNews } from "./news.js";
 
+/** What this player wants: money, years, and maybe a no-trade clause. */
 export function playerDemand(state, player, teamId) {
   const team = state.teams[teamId];
   const diff = DIFFICULTY[state.settings.difficulty] || DIFFICULTY.normal;
@@ -25,6 +30,7 @@ export function playerDemand(state, player, teamId) {
   return { salary, years: clamp(years, 1, 8), ntc, nmc, twoWay: player.ratings.overall < 73 };
 }
 
+/** Score your offer. 52 or higher and they sign. */
 export function evaluateOffer(state, player, teamId, offer) {
   const demand = playerDemand(state, player, teamId);
   const team = state.teams[teamId];
@@ -50,6 +56,7 @@ export function evaluateOffer(state, player, teamId, offer) {
   return { accept, score, demand, message: accept ? "The player is ready to sign." : offerReply(score) };
 }
 
+/** What the agent says when they do not like the deal. */
 function offerReply(score) {
   if (score >= 48) return "Close — wants a bit more term or money.";
   if (score >= 40) return "Not interested at this number.";
@@ -57,6 +64,7 @@ function offerReply(score) {
   return "The player’s camp hung up. Far apart.";
 }
 
+/** Put the player on the team and stamp the new deal. */
 export function applyContract(state, player, teamId, offer) {
   player.teamId = teamId;
   player.status = player.ratings.overall >= 72 || offer.twoWay === false ? "nhl" : "minors";
@@ -83,6 +91,7 @@ export function applyContract(state, player, teamId, offer) {
   }
 }
 
+/** Tick every contract down one year. Zero years left means free agency or retirement. */
 export function expireContracts(state, rng, news) {
   for (const p of Object.values(state.players)) {
     if (!p.contract || p.status === "retired") continue;
@@ -110,6 +119,7 @@ export function expireContracts(state, rng, news) {
   }
 }
 
+/** Take a player off the ice for good. Big names go into the hall. */
 export function retirePlayer(state, p, news) {
   const team = p.teamId ? state.teams[p.teamId] : null;
   if (team) {
@@ -125,12 +135,14 @@ export function retirePlayer(state, p, news) {
   }
 }
 
+/** Share of possible points this team has earned. 1.0 would be winning every game. */
 function teamPointsPct(team) {
   const gp = team.record.gp || 0;
   if (!gp) return 0.5;
   return (team.record.w * 2 + team.record.ot) / (gp * 2);
 }
 
+/** True if this player might sign a new deal before they hit free agency. */
 export function extensionInterest(player, teamId, state) {
   if (!player.contract || player.contract.yearsLeft !== 1) return false;
   if (player.age >= 37) return false;
