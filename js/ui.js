@@ -20,7 +20,7 @@ const ui = {
   txTab: "trades",
   setup: { teamId: "bos", difficulty: "normal", salaryCap: 88e6, ownerGoal: "playoffs" },
   selectedPlayer: null,
-  trade: { teamId: "tor", give: [], get: [] },
+  trade: { teamId: "tor", give: [], get: [], picking: false },
   recap: null,
   toast: null,
   rosterFilter: "nhl",
@@ -47,19 +47,23 @@ function bindHash() {
 /** Wipe the page and draw the right screen for where you are. */
 function render() {
   if (ui.toast) setTimeout(() => { ui.toast = null; render(); }, 2800);
-  if (!G.hasGame()) {
-    app.innerHTML = ui.screen === "setup" ? setupScreen() : titleScreen();
+  if (!G.hasGame() || ui.screen === "title" || ui.screen === "setup") {
+    app.innerHTML = (ui.screen === "setup" ? setupScreen() : titleScreen()) + toastHtml();
     bind();
     return;
   }
   const s = G.getState();
   if (s.owner?.fired) {
-    app.innerHTML = firedScreen(s);
+    app.innerHTML = firedScreen(s) + toastHtml();
     bind();
     return;
   }
   app.innerHTML = shell(s);
   bind();
+}
+
+function toastHtml() {
+  return ui.toast ? `<div class="toast">${esc(ui.toast)}</div>` : "";
 }
 
 /** First screen: New Franchise, Continue, Load. */
@@ -183,6 +187,10 @@ function shell(s) {
           <div class="kicker">NHL</div>
           <h2>FRANCHISE</h2>
         </div>
+        <div class="file-actions">
+          <button class="btn small" data-act="save">Save</button>
+          <button class="btn small ghost" data-act="title">Exit</button>
+        </div>
         ${navBtn("home", "Home")}
         ${navBtn("roster", "Roster")}
         ${navBtn("transactions", "Transactions")}
@@ -197,10 +205,6 @@ function shell(s) {
           <div><strong>${esc(t.abbr)}</strong> ${formatRecord(t.record)}</div>
           <div>${seasonLabel(s.season)} · ${esc(s.phase)}</div>
           <div>Cap ${formatCap(G.capSpace(s, t.id))}</div>
-          <div style="margin-top:8px;display:flex;gap:6px">
-            <button class="btn small" data-act="save">Save</button>
-            <button class="btn small ghost" data-act="title">Exit</button>
-          </div>
         </div>
       </aside>
       <main class="main">
@@ -432,8 +436,11 @@ function viewTx(s, t) {
 
 /** Two columns: you give stuff, they give stuff. */
 function tradeMachine(s, t) {
-  const other = s.teams[ui.trade.teamId] || s.teams.tor;
-  const giveV = 1, getV = 1;
+  const partners = Object.values(s.teams).filter((x) => x.id !== t.id).sort((a, b) => a.displayName.localeCompare(b.displayName));
+  if (!ui.trade.teamId || ui.trade.teamId === t.id || !s.teams[ui.trade.teamId]) {
+    ui.trade.teamId = partners[0]?.id;
+  }
+  const other = s.teams[ui.trade.teamId];
   const val = G.valueLabel(estimateRatio(s, t.id, other.id));
   return `<div class="trade">
     <div class="trade-col">
@@ -442,17 +449,27 @@ function tradeMachine(s, t) {
       <div class="chip-list">${ui.trade.give.map((a) => chip(s, a, "give")).join("")}</div>
     </div>
     <div class="trade-col">
-      <label class="field">Partner
-        <select data-act="trade-team">
-          ${Object.values(s.teams).filter((x) => x.id !== t.id).map((x) => `<option value="${x.id}" ${x.id === other.id ? "selected" : ""}>${esc(x.displayName)} (${x.philosophy})</option>`).join("")}
-        </select>
-      </label>
+      <label class="field">Partner</label>
+      <div class="partner-picker">
+        <button type="button" class="btn partner-btn" data-act="trade-open">
+          ${crest(other, "sm")}
+          <span>${esc(other.displayName)}</span>
+        </button>
+        ${ui.trade.picking ? `<div class="partner-menu">
+          ${partners.map((x) => `
+            <button type="button" class="partner-opt ${x.id === other.id ? "selected" : ""}" data-act="trade-team" data-id="${x.id}">
+              ${crest(x, "sm")}
+              <span>${esc(x.displayName)}</span>
+              <span class="faint">${esc(x.abbr)}</span>
+            </button>`).join("")}
+        </div>` : ""}
+      </div>
       ${assetPicker(s, other, "get")}
       <div class="chip-list">${ui.trade.get.map((a) => chip(s, a, "get")).join("")}</div>
     </div>
   </div>
   <div class="card" style="margin-top:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
-    <div><div class="faint">Balance (estimated)</div><div class="stat sm ${val.tone === "bad" ? "" : ""}">${val.text}</div></div>
+    <div><div class="faint">Balance (estimated)</div><div class="stat sm">${val.text}</div></div>
     <button class="btn primary" data-act="propose">Propose trade</button>
   </div>`;
 }
@@ -817,6 +834,8 @@ function findPlayoffGame(s, id) {
 /** Listen for clicks and dropdown changes on the page. */
 function bind() {
   app.onclick = (e) => {
+    // Native dropdowns use change, not click. Re-drawing on click closes the menu.
+    if (e.target.closest("select, option")) return;
     if (e.target.closest("[data-stop]") && !e.target.closest("button, select, [data-act]")) return;
     const el = e.target.closest("[data-act]");
     if (!el) return;
@@ -844,18 +863,44 @@ function handle(act, el, e) {
     "set-goal": () => { ui.setup.ownerGoal = el.value; },
     start: () => {
       G.newGame(ui.setup);
+      ui.screen = "home";
       ui.view = "home";
       render();
     },
-    load: () => { G.loadGame(el.dataset.slot); ui.view = "home"; render(); },
-    "load-autosave": () => { G.loadGame("autosave"); ui.view = "home"; render(); },
+    load: () => {
+      const loaded = G.loadGame(el.dataset.slot);
+      if (!loaded) { toast("That save is empty."); return; }
+      ui.screen = "home";
+      ui.view = "home";
+      render();
+    },
+    "load-autosave": () => {
+      const loaded = G.loadGame("autosave");
+      if (!loaded) { toast("No saved franchise to continue."); return; }
+      ui.screen = "home";
+      ui.view = "home";
+      render();
+    },
     nav: () => { ui.view = el.dataset.view; location.hash = ui.view; render(); },
-    save: () => { G.saveGame("slot1"); toast("Franchise saved."); },
-    title: () => { G.saveGame("autosave"); ui.screen = "title"; render(); },
+    save: () => {
+      const res = G.saveGame("slot1");
+      toast(res.ok ? "Franchise saved." : (res.error || "Save failed."));
+    },
+    title: () => {
+      const res = G.saveGame("slot1");
+      G.unloadGame();
+      ui.screen = "title";
+      ui.view = "home";
+      ui.selectedPlayer = null;
+      ui.recap = null;
+      if (location.hash) location.hash = "";
+      ui.toast = res.ok ? "Franchise saved. You can Continue later." : (res.error || "Could not save before exit.");
+      render();
+    },
     player: () => { ui.selectedPlayer = id; render(); },
     "close-modal": () => { if (e.target.dataset.stop) return; ui.selectedPlayer = null; render(); },
     "roster-tab": () => { ui.rosterTab = id; render(); },
-    "tx-tab": () => { ui.txTab = id; render(); },
+    "tx-tab": () => { ui.txTab = id; ui.trade.picking = false; render(); },
     "league-tab": () => { ui.leagueTab = id; render(); },
     "auto-lines": () => { G.autoSetUserLines(); render(); },
     line: () => { G.setLineSlot(el.dataset.key, Number(el.dataset.i), el.value || null); render(); },
@@ -873,7 +918,17 @@ function handle(act, el, e) {
     "offseason-next": () => { G.continueOffseason(); ui.view = G.getState().phase === "draft" ? "draft" : G.getState().phase === "freeAgency" ? "transactions" : ui.view; if (G.getState().phase === "freeAgency") ui.txTab = "fa"; render(); },
     "fa-day": () => { G.simFADay(); render(); },
     "fa-skip": () => { G.skipFreeAgency(); toast("Camp is open."); },
-    "trade-team": () => { ui.trade.teamId = el.value; ui.trade.get = []; render(); },
+    "trade-open": () => { ui.trade.picking = !ui.trade.picking; render(); },
+    "trade-team": () => {
+      const next = id || el.value;
+      if (!next) return;
+      ui.trade.picking = false;
+      if (next !== ui.trade.teamId) {
+        ui.trade.teamId = next;
+        ui.trade.get = [];
+      }
+      render();
+    },
     "add-asset": () => {
       if (!el.value) return;
       ui.trade[el.dataset.side].push({ kind: el.dataset.kind, id: el.value });

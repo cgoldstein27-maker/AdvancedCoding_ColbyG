@@ -42,8 +42,9 @@ export function saveTo(slot, state) {
     },
     state,
   };
-  localStorage.setItem(PREFIX + slot, JSON.stringify(payload));
-  if (slot !== "autosave") localStorage.setItem(PREFIX + "autosave", JSON.stringify(payload));
+  const raw = JSON.stringify(payload);
+  localStorage.setItem(PREFIX + slot, raw);
+  if (slot !== "autosave") localStorage.setItem(PREFIX + "autosave", raw);
   return true;
 }
 

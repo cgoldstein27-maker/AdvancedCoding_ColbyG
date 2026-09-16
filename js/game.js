@@ -62,9 +62,15 @@ export function newGame(opts) {
 
 /** Write the game into a save slot. */
 export function saveGame(slot = "slot1") {
-  if (!state) return false;
-  saveTo(slot, state);
-  return true;
+  if (!state) return { ok: false, error: "No franchise is loaded." };
+  try {
+    saveTo(slot, state);
+    return { ok: true };
+  } catch (err) {
+    console.warn("Save failed", err);
+    const quota = err?.name === "QuotaExceededError" || /quota/i.test(String(err));
+    return { ok: false, error: quota ? "Save is too large for this browser." : "Could not save the franchise." };
+  }
 }
 
 /** Open a saved franchise. */
@@ -73,6 +79,11 @@ export function loadGame(slot = "autosave") {
   if (!loaded) return null;
   state = loaded;
   return state;
+}
+
+/** Leave the franchise so the title screen can show. */
+export function unloadGame() {
+  state = null;
 }
 
 /** True if a franchise is already loaded. */
